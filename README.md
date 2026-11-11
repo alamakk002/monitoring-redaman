@@ -45,3 +45,15 @@ Jika ingin membaca data sinyal asli langsung dari perangkat OLT (ZTE/Huawei/VSOL
 Buka Terminal/CMD, lalu jalankan perintah:
 ```bash
 pip install fastapi uvicorn netmiko
+```
+
+### 3. Konfigurasi IP OLT
+Buka file `server.py`, lalu sesuaikan konfigurasi IP, username, dan password OLT kantor Anda:
+```python
+OLT_DEVICE = {
+    "device_type": "zte_zxros",  # zte_zxros, huawei, cisco_ios
+    "host": "192.168.1.100",     # Ganti dengan IP OLT kantor Anda
+    "username": "admin",
+    "password": "password_asli_olt",
+    "port": 23                   # 23 (Telnet) atau 22 (SSH)
+}
