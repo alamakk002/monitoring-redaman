@@ -33,26 +33,15 @@ Untuk sekadar menggunakan kalkulator atau melihat simulasi:
 
 ---
 
-### B. Menghubungkan ke Perangkat Fisik OLT (Mode Jaringan Riil)
+## B. Menghubungkan ke Perangkat Fisik OLT (Mode Jaringan Riil)
 
 Jika ingin membaca data sinyal asli langsung dari perangkat OLT (ZTE/Huawei/VSOL) di kantor:
 
-#### 1. Persyaratan Sistem
+### 1. Persyaratan Sistem
 - Laptop/PC tercolok kabel LAN manajemen OLT.
 - Terpasang Python 3.8 atau lebih baru.
 
-#### 2. Instalasi Pustaka Pendukung
-Buka Terminal/CMD, lalu jalankan:
+### 2. Instalasi Pustaka Pendukung
+Buka Terminal/CMD, lalu jalankan perintah:
 ```bash
 pip install fastapi uvicorn netmiko
-
-#### 3. Konfigurasi IP OLT
-Buka file `server.py`, lalu sesuaikan konfigurasi IP, username, dan password OLT kantor Anda:
-```python
-OLT_DEVICE = {
-    "device_type": "zte_zxros",  # zte_zxros, huawei, cisco_ios
-    "host": "192.168.1.100",     # Ganti dengan IP OLT kantor Anda
-    "username": "admin",
-    "password": "password_asli_olt",
-    "port": 23                   # 23 (Telnet) atau 22 (SSH)
-}
