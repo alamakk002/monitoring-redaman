@@ -897,7 +897,30 @@
     let chartHistory = null;
 
     // Load from localStorage or set defaults
-    function loadState() {
+    async function loadState() {
+      try {
+        // Coba panggil backend server OLT
+        const response = await fetch('http://localhost:5000/api/clients');
+        const data = await response.json();
+        
+        if (Array.isArray(data) && data.length > 0) {
+          clients = data;
+          showToast("Data riil OLT berhasil dimuat", "success");
+        } else {
+          loadFromLocal();
+        }
+      } catch (err) {
+        // Jika server backend belum aktif / OLT belum tersambung
+        loadFromLocal();
+      }
+      
+      updateKPIs();
+      populateODPFilter();
+      renderClientTable();
+      updateCharts();
+    }
+
+    function loadFromLocal() {
       try {
         const savedClients = localStorage.getItem('optipulse_clients');
         clients = savedClients ? JSON.parse(savedClients) : [...DEFAULT_CLIENTS];
