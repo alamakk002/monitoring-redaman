@@ -83,7 +83,7 @@
           <div class="hidden md:flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/60 text-xs">
             <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             <span class="text-slate-400">Server OLT:</span>
-            <span class="text-emerald-400 font-medium">Terhubung</span>
+            <span id="header-olt-status" class="text-amber-400 font-medium">Mengecek...</span>
             <span class="text-slate-600">|</span>
             <span id="live-clock" class="font-mono text-slate-300">--:--:--</span>
           </div>
@@ -141,6 +141,38 @@
     <!-- TAB 1: DASHBOARD & MONITORING KLIEN        -->
     <!-- ========================================== -->
     <div id="tab-monitoring" class="tab-pane space-y-6">
+      <!-- Mode Switcher Banner (Contoh Tampilan vs Jaringan Terhubung) -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 sm:p-4 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full md:w-auto">
+          <span class="text-xs font-semibold text-slate-300 whitespace-nowrap flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
+            Pilihan Mode:
+          </span>
+          <!-- Dynamic Toggle Buttons requested by user -->
+          <div class="inline-flex p-1 bg-slate-950 rounded-lg border border-slate-800 w-full sm:w-auto">
+            <button id="btn-mode-demo" class="flex-1 sm:flex-none px-3.5 py-1.5 rounded-md text-xs font-semibold transition flex items-center justify-center gap-1.5 bg-teal-500/20 text-teal-300 border border-teal-500/30">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              <span id="label-mode-demo">Menampilkan Contoh Tampilan</span>
+            </button>
+            <button id="btn-mode-live" class="flex-1 sm:flex-none px-3.5 py-1.5 rounded-md text-xs font-semibold text-slate-400 hover:text-slate-200 transition flex items-center justify-center gap-1.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              <span id="label-mode-live">Jaringan yang Terhubung Kosong</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Network Status Indicator & Check Connection Button -->
+        <div class="flex items-center gap-2.5 w-full md:w-auto justify-between sm:justify-end border-t md:border-t-0 pt-2 md:pt-0 border-slate-800">
+          <div id="network-indicator-badge" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            <span id="network-indicator-dot" class="w-2 h-2 rounded-full bg-amber-400"></span>
+            <span id="network-status-text">Tidak Terhubung (Offline / Hotspot)</span>
+          </div>
+          <button id="btn-check-network" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-300 flex items-center gap-1.5 transition" title="Coba hubungkan kembali ke OLT / backend">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Cek Koneksi
+          </button>
+        </div>
+      </div>
       <!-- KPI Stats Grid -->
       <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative overflow-hidden">
@@ -891,45 +923,161 @@
     let isSimulating = false;
     let simInterval = null;
 
+    // Mode & Connection States
+    let currentMode = "DEMO"; // "DEMO" | "LIVE"
+    let isConnectedToNetwork = false;
+    let liveNetworkClients = [];
+
     // Charts instances
     let chartDistribution = null;
     let chartOdpHealth = null;
     let chartHistory = null;
 
-    // Load from localStorage or set defaults
-    async function loadState() {
+    // Load initial state
+    function loadState() {
       try {
-        // Coba panggil backend server OLT
-        const response = await fetch('http://localhost:5000/api/clients');
-        const data = await response.json();
+        const savedAlerts = localStorage.getItem('optipulse_alerts');
+        alerts = savedAlerts ? JSON.parse(savedAlerts) : [...DEFAULT_ALERTS];
+      } catch (e) {
+        alerts = [...DEFAULT_ALERTS];
+      }
+
+      // Default to DEMO data initially
+      if (currentMode === "DEMO") {
+        try {
+          const savedClients = localStorage.getItem('optipulse_clients');
+          clients = savedClients ? JSON.parse(savedClients) : [...DEFAULT_CLIENTS];
+        } catch (e) {
+          clients = [...DEFAULT_CLIENTS];
+        }
+      } else {
+        clients = isConnectedToNetwork ? [...liveNetworkClients] : [];
+      }
+    }
+
+    // Check OLT backend connection asynchronously
+    async function checkNetworkConnection(notify = false) {
+      const headerStatus = document.getElementById('header-olt-status');
+      const badgeText = document.getElementById('network-status-text');
+      const badgeDot = document.getElementById('network-indicator-dot');
+      const badgeBox = document.getElementById('network-indicator-badge');
+
+      if (headerStatus) {
+        headerStatus.textContent = "Mengecek...";
+        headerStatus.className = "text-amber-400 font-medium animate-pulse";
+      }
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
         
+        const response = await fetch('http://localhost:5000/api/clients', { signal: controller.signal });
+        clearTimeout(timeoutId);
+        const data = await response.json();
+
         if (Array.isArray(data) && data.length > 0) {
-          clients = data;
-          showToast("Data riil OLT berhasil dimuat", "success");
+          isConnectedToNetwork = true;
+          liveNetworkClients = data;
+          if (notify) showToast(`Terhubung ke jaringan OLT (${data.length} klien terdeteksi)`, "success");
+        } else if (data && data.error) {
+          isConnectedToNetwork = false;
+          liveNetworkClients = [];
+          if (notify) showToast("Backend online, namun OLT belum terjangkau (Hotspot)", "warning");
         } else {
-          loadFromLocal();
+          isConnectedToNetwork = false;
+          liveNetworkClients = [];
         }
       } catch (err) {
-        // Jika server backend belum aktif / OLT belum tersambung
-        loadFromLocal();
+        isConnectedToNetwork = false;
+        liveNetworkClients = [];
+        if (notify) showToast("Tidak terhubung ke OLT (Menggunakan Hotspot / Offline)", "info");
       }
-      
+
+      updateModeUI();
+
+      if (currentMode === "LIVE") {
+        clients = isConnectedToNetwork ? [...liveNetworkClients] : [];
+        updateKPIs();
+        populateODPFilter();
+        renderClientTable();
+        updateCharts();
+      }
+    }
+
+    // Update labels and active states of buttons based on connection
+    function updateModeUI() {
+      const btnDemo = document.getElementById('btn-mode-demo');
+      const btnLive = document.getElementById('btn-mode-live');
+      const labelDemo = document.getElementById('label-mode-demo');
+      const labelLive = document.getElementById('label-mode-live');
+      const headerStatus = document.getElementById('header-olt-status');
+      const badgeText = document.getElementById('network-status-text');
+      const badgeDot = document.getElementById('network-indicator-dot');
+      const badgeBox = document.getElementById('network-indicator-badge');
+
+      if (isConnectedToNetwork) {
+        // Connected mode labels
+        labelDemo.textContent = "Contoh Tampilan";
+        labelLive.textContent = "Lihat Jaringan yang Terhubung";
+
+        if (badgeBox) badgeBox.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+        if (badgeDot) badgeDot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
+        if (badgeText) badgeText.textContent = `Terhubung ke OLT (${liveNetworkClients.length} Klien)`;
+        if (headerStatus) {
+          headerStatus.textContent = "Terhubung";
+          headerStatus.className = "text-emerald-400 font-medium";
+        }
+      } else {
+        // Disconnected mode labels (exact requested text)
+        labelDemo.textContent = "Menampilkan Contoh Tampilan";
+        labelLive.textContent = "Jaringan yang Terhubung Kosong";
+
+        if (badgeBox) badgeBox.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20";
+        if (badgeDot) badgeDot.className = "w-2 h-2 rounded-full bg-amber-400";
+        if (badgeText) badgeText.textContent = "Tidak Terhubung (Offline / Hotspot)";
+        if (headerStatus) {
+          headerStatus.textContent = "Offline (Hotspot)";
+          headerStatus.className = "text-amber-400 font-medium";
+        }
+      }
+
+      // Highlight active button
+      if (currentMode === "DEMO") {
+        btnDemo.className = "flex-1 sm:flex-none px-3.5 py-1.5 rounded-md text-xs font-semibold transition flex items-center justify-center gap-1.5 bg-teal-500/20 text-teal-300 border border-teal-500/30 shadow-sm";
+        btnLive.className = "flex-1 sm:flex-none px-3.5 py-1.5 rounded-md text-xs font-semibold text-slate-400 hover:text-slate-200 transition flex items-center justify-center gap-1.5";
+      } else {
+        btnLive.className = "flex-1 sm:flex-none px-3.5 py-1.5 rounded-md text-xs font-semibold transition flex items-center justify-center gap-1.5 bg-teal-500/20 text-teal-300 border border-teal-500/30 shadow-sm";
+        btnDemo.className = "flex-1 sm:flex-none px-3.5 py-1.5 rounded-md text-xs font-semibold text-slate-400 hover:text-slate-200 transition flex items-center justify-center gap-1.5";
+      }
+    }
+
+    // Switch between DEMO and LIVE
+    function switchMode(newMode) {
+      currentMode = newMode;
+      if (currentMode === "DEMO") {
+        try {
+          const savedClients = localStorage.getItem('optipulse_clients');
+          clients = savedClients ? JSON.parse(savedClients) : [...DEFAULT_CLIENTS];
+        } catch (e) {
+          clients = [...DEFAULT_CLIENTS];
+        }
+        showToast("Beralih ke mode Contoh Tampilan (Simulasi)", "info");
+      } else {
+        // LIVE Mode
+        if (isConnectedToNetwork) {
+          clients = [...liveNetworkClients];
+          showToast(`Menampilkan ${clients.length} klien dari jaringan riil OLT`, "success");
+        } else {
+          clients = [];
+          showToast("Jaringan yang terhubung kosong (OLT Offline / Hotspot)", "warning");
+        }
+      }
+
+      updateModeUI();
       updateKPIs();
       populateODPFilter();
       renderClientTable();
       updateCharts();
-    }
-
-    function loadFromLocal() {
-      try {
-        const savedClients = localStorage.getItem('optipulse_clients');
-        clients = savedClients ? JSON.parse(savedClients) : [...DEFAULT_CLIENTS];
-        const savedAlerts = localStorage.getItem('optipulse_alerts');
-        alerts = savedAlerts ? JSON.parse(savedAlerts) : [...DEFAULT_ALERTS];
-      } catch (e) {
-        clients = [...DEFAULT_CLIENTS];
-        alerts = [...DEFAULT_ALERTS];
-      }
     }
 
     function saveState() {
@@ -1075,6 +1223,37 @@
       document.getElementById('showing-count').textContent = filtered.length;
 
       if (filtered.length === 0) {
+        if (currentMode === "LIVE" && !isConnectedToNetwork) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="6" class="text-center py-14 px-4">
+                <div class="max-w-md mx-auto text-center space-y-3">
+                  <div class="w-12 h-12 mx-auto rounded-full bg-slate-800 border border-slate-700/80 flex items-center justify-center text-amber-400">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 4.243a9 9 0 01-12.728 0m0 0l2.829-2.829m-2.829 2.829L3 21m2.828-5.464a5 5 0 010-7.072m0 0l2.829 2.829"/></svg>
+                  </div>
+                  <h4 class="text-base font-bold text-slate-100">Jaringan yang Terhubung Kosong</h4>
+                  <p class="text-xs text-slate-400 leading-relaxed">
+                    Perangkat Anda saat ini belum terhubung ke OLT fisik atau Anda sedang menggunakan hotspot HP. Tidak ada data klien riil yang terdeteksi.
+                  </p>
+                  <div class="pt-2 flex items-center justify-center gap-3">
+                    <button id="empty-btn-to-demo" class="px-4 py-2 bg-teal-500 hover:bg-teal-400 text-slate-950 rounded-lg text-xs font-semibold shadow transition">
+                      Menampilkan Contoh Tampilan
+                    </button>
+                    <button id="empty-btn-retry" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-medium transition">
+                      Coba Hubungkan Ulang
+                    </button>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          `;
+          const btnToDemo = document.getElementById('empty-btn-to-demo');
+          const btnRetry = document.getElementById('empty-btn-retry');
+          if (btnToDemo) btnToDemo.addEventListener('click', () => switchMode('DEMO'));
+          if (btnRetry) btnRetry.addEventListener('click', () => checkNetworkConnection(true));
+          return;
+        }
+
         tbody.innerHTML = `
           <tr>
             <td colspan="6" class="text-center py-10 text-slate-500">
@@ -1878,6 +2057,11 @@
         showToast(`Hasil hitung cepat (${val.toFixed(2)} dBm) siap disimpan`, "info");
       });
 
+      // Mode switcher event listeners
+      document.getElementById('btn-mode-demo').addEventListener('click', () => switchMode('DEMO'));
+      document.getElementById('btn-mode-live').addEventListener('click', () => switchMode('LIVE'));
+      document.getElementById('btn-check-network').addEventListener('click', () => checkNetworkConnection(true));
+
       // Initial renders
       updateKPIs();
       populateODPFilter();
@@ -1886,6 +2070,9 @@
       initCharts();
       calculateLinkBudget();
       calculateQuickDrop();
+
+      // Check OLT connection on startup (asynchronously without blocking UI)
+      checkNetworkConnection(false);
     });
   </script>
 </body>
