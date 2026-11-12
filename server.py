@@ -9,6 +9,7 @@ from pathlib import Path
 from fastapi import Body, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, Response
+from fastapi.staticfiles import StaticFiles
 from netmiko import ConnectHandler
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -76,6 +77,13 @@ async def lifespan(_app):
 
 
 app = FastAPI(title="OptiPulse NOC", version="1.3.0", lifespan=lifespan)
+
+# Aset offline (Tailwind & Chart.js) disajikan dari folder yang sama.
+app.mount(
+    "/vendor",
+    StaticFiles(directory=BASE_DIR / "vendor", check_dir=False),
+    name="vendor",
+)
 
 # Origin yang diizinkan. Default "*" agar bisa dibuka dari GitHub Pages / HP.
 # Contoh: OPTIPULSE_ALLOWED_ORIGINS="https://alamakk002.github.io,http://localhost:8000"

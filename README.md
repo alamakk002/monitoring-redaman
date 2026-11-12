@@ -43,6 +43,8 @@ Aplikasi pemantauan kualitas jaringan FTTH (Fiber to the Home) dan kalkulator re
 - Python 3.8 atau lebih baru.
 - Port `5000` tidak dipakai aplikasi lain.
 
+> Tidak perlu koneksi internet. Tailwind, Chart.js, dan font (Inter & JetBrains Mono) disajikan dari folder `vendor/`.
+
 ### 2. Instalasi
 
 ```bash
@@ -198,9 +200,10 @@ window.OPTIPULSE_SAME_ORIGIN === true ? location.origin
 ## 📂 Struktur File
 
 ```
-index.html          # UI aplikasi (Tailwind + Chart.js via CDN)
+index.html          # UI aplikasi (Tailwind, Chart.js, font lokal di vendor/)
 server.py           # FastAPI: menyajikan UI, API OLT, dan /api/state
 start-optipulse.bat # Menjalankan server dengan sekali klik (Windows)
 README.md           # Dokumentasi ini
+vendor/             # Tailwind, Chart.js, dan font untuk pemakaian offline
 optipulse.db        # Database SQLite data bersama (dibuat otomatis, tidak di-commit)
 ```

@@ -7,10 +7,12 @@
   <meta name="theme-color" content="#0f172a">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%2314b8a6'/%3E%3Cpath d='M13 3 5 14h6l-1 7 9-12h-6l1-6z' fill='%23020617'/%3E%3C/svg%3E">
   <title>OptiPulse NOC - Monitoring Klien & Kalkulator Redaman FTTH</title>
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
-  <!-- Chart.js CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+  <!-- Tailwind CSS: file lokal, cadangan ke CDN bila tidak ada -->
+  <script src="vendor/tailwind-3.4.17.js"></script>
+  <script>window.tailwind || document.write('<script src="https://cdn.tailwindcss.com/3.4.17"><\/script>');</script>
+  <!-- Chart.js: file lokal, cadangan ke CDN bila tidak ada -->
+  <script src="vendor/chart.umd-4.4.1.js"></script>
+  <script>window.Chart || document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"><\/script>');</script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -29,7 +31,7 @@
     }
   </script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+    @import url('vendor/fonts/fonts.css');
     body {
       font-family: 'Inter', sans-serif;
     }
