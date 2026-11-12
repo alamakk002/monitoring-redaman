@@ -287,13 +287,16 @@ window.OPTIPULSE_SAME_ORIGIN === true ? location.origin
 
 ## 📏 Ambang Redaman GPON
 
-| Rentang Rx | Status |
-|---|---|
-| -15 s/d -22 dBm | Optimal |
-| -22 s/d -25 dBm | Normal |
-| -25 s/d -27 dBm | Waspada |
-| < -27 dBm | Kritis / berisiko RTO |
-| ≤ -31 dBm | LOS |
+| Rentang Rx | Status | Tindakan |
+|---|---|---|
+| > -15 dBm | **Terlalu kuat** | Risiko saturasi receiver. Tambahkan atenuator 5–10 dB, periksa rasio splitter, dan pastikan ukur di 1490 nm |
+| -15 s/d -22 dBm | Optimal | Tidak ada tindakan |
+| -22 s/d -25 dBm | Normal | Tidak ada tindakan |
+| -25 s/d -27 dBm | Waspada | Bersihkan konektor, cek tekukan kabel |
+| < -27 dBm | Kritis / berisiko RTO | Perbaikan segera |
+| ≤ -31 dBm | LOS | Cek putus fiber / ONT mati |
+
+> Daya maksimum yang masih aman bagi receiver ONT kelas B+ sekitar **-8 dBm**. Angka -14 dBm masih bekerja, tetapi menandakan desain jaringan terlalu "kuat" (splitter kurang, jarak terlalu dekat, atau salah ukur).
 
 ---
 

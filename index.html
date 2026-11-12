@@ -221,7 +221,7 @@
         </div>
       </div>
       <!-- KPI Stats Grid -->
-      <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+      <div class="grid grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4">
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative overflow-hidden">
           <div class="text-xs text-slate-400 font-medium">Total Klien Terdata</div>
           <div class="text-2xl font-bold text-slate-100 mt-1" id="stat-total">0</div>
@@ -230,6 +230,15 @@
           </div>
           <div class="absolute right-3 bottom-3 text-slate-800">
             <svg class="w-10 h-10" fill="currentColor" viewBox="0 0 20 20"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative overflow-hidden">
+          <div class="text-xs text-slate-400 font-medium">Terlalu Kuat (&gt; -15 dBm)</div>
+          <div class="text-2xl font-bold text-fuchsia-400 mt-1" id="stat-over">0</div>
+          <div class="text-[11px] text-fuchsia-500/80 mt-1">Risiko saturasi, perlu atenuator</div>
+          <div class="absolute right-3 bottom-3 text-fuchsia-950/40">
+            <svg class="w-10 h-10" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 6a2 2 0 114 0v4a2 2 0 11-4 0V6zm2 8a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" clip-rule="evenodd"/></svg>
           </div>
         </div>
 
@@ -282,6 +291,7 @@
             <canvas id="chart-distribution"></canvas>
           </div>
           <div class="mt-4 grid grid-cols-2 gap-2 text-[11px] text-slate-400">
+            <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-fuchsia-400"></span> Terlalu Kuat (&gt; -15)</div>
             <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> Optimal (-15 s/d -22 dBm)</div>
             <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span> Normal (-22 s/d -25)</div>
             <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span> Waspada (-25 s/d -27)</div>
@@ -320,6 +330,7 @@
             <!-- Status Filter -->
             <select id="filter-status" aria-label="Filter status sinyal" class="bg-slate-800/80 border border-slate-700 rounded-lg px-3 py-2 text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-teal-500">
               <option value="ALL">Semua Status Sinyal</option>
+              <option value="OVERPOWER">Terlalu Kuat (&gt; -15 dBm)</option>
               <option value="OPTIMAL">Optimal (-15 s/d -22 dBm)</option>
               <option value="NORMAL">Normal (-22 s/d -25 dBm)</option>
               <option value="WARNING">Waspada (-25 s/d -27 dBm)</option>
@@ -837,7 +848,7 @@
             <span class="text-xs text-slate-400 font-mono">dBm</span>
           </div>
           <div class="flex items-center justify-between text-[11px] text-slate-400 mt-1">
-            <span>Contoh: -18.50 (Bagus), -24.00 (Normal), -28.00 (Kritis)</span>
+            <span>Contoh: -18.50 (Bagus), -24.00 (Normal), -13.00 (Terlalu kuat), -28.00 (Kritis)</span>
             <button type="button" id="btn-use-calc-in-modal" class="text-teal-400 hover:underline">Gunakan Nilai Kalkulator</button>
           </div>
         </div>
@@ -956,7 +967,8 @@
       { id: "CLI-1007", name: "Bpk. Agus Prasetyo", package: "Home 20 Mbps", odp: "ODP-TMR-08", port: 6, ip: "192.168.40.18", sn: "FBDT88491021", rxPower: -26.90, status: "WARNING", latency: 24 },
       { id: "CLI-1008", name: "Gudang Logistik Cepat", package: "Biz Dedicated 300M", odp: "ODP-TMR-08", port: 2, ip: "192.168.40.05", sn: "HWTC22394012", rxPower: -28.95, status: "CRITICAL", latency: 85 },
       { id: "CLI-1009", name: "Bpk. Dedi Kurniawan", package: "Home 20 Mbps", odp: "ODP-KBR-03", port: 8, ip: "192.168.10.88", sn: "ZTEGC1182749", rxPower: -33.40, status: "LOS", latency: 0 },
-      { id: "CLI-1010", name: "Apotek Sehat Sentosa", package: "Home 50 Mbps", odp: "ODP-KBR-03", port: 2, ip: "192.168.10.42", sn: "HWTC10928471", rxPower: -19.90, status: "OPTIMAL", latency: 4 }
+      { id: "CLI-1010", name: "Apotek Sehat Sentosa", package: "Home 50 Mbps", odp: "ODP-KBR-03", port: 2, ip: "192.168.10.42", sn: "HWTC10928471", rxPower: -19.90, status: "OPTIMAL", latency: 4 },
+      { id: "CLI-1011", name: "Kafe Kopi Senja", package: "Home 100 Mbps", odp: "ODP-SBY-04", port: 6, ip: "192.168.20.66", sn: "ZTEGC9012477", rxPower: -13.20, status: "OVERPOWER", latency: 3 }
     ];
 
     const DEFAULT_ALERTS = [
@@ -1419,6 +1431,7 @@
     // Helper: Categorize Redaman Status
     function categorizeRedaman(rx) {
       if (!Number.isFinite(rx)) return "UNKNOWN";
+      if (rx > -15.0) return "OVERPOWER";
       if (rx <= -31.0) return "LOS";
       if (rx < -27.0) return "CRITICAL";
       if (rx < -25.0) return "WARNING";
@@ -1428,6 +1441,8 @@
 
     function getStatusBadge(status) {
       switch (status) {
+        case "OVERPOWER":
+          return `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20"><span class="w-1.5 h-1.5 rounded-full bg-fuchsia-400"></span> Terlalu Kuat</span>`;
         case "OPTIMAL":
           return `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Optimal</span>`;
         case "NORMAL":
@@ -1447,6 +1462,7 @@
 
     function getRxColor(status) {
       switch (status) {
+        case "OVERPOWER": return "text-fuchsia-400";
         case "OPTIMAL": return "text-emerald-400";
         case "NORMAL": return "text-cyan-400";
         case "WARNING": return "text-amber-400";
@@ -1497,17 +1513,19 @@
     // ==========================================
     function updateKPIs() {
       const total = clients.length;
-      let optimal = 0, normal = 0, warning = 0, critical = 0;
+      let over = 0, optimal = 0, normal = 0, warning = 0, critical = 0;
 
       clients.forEach(c => {
         const st = categorizeRedaman(c.rxPower);
-        if (st === "OPTIMAL") optimal++;
+        if (st === "OVERPOWER") over++;
+        else if (st === "OPTIMAL") optimal++;
         else if (st === "NORMAL") normal++;
         else if (st === "WARNING") warning++;
         else critical++; // CRITICAL & LOS
       });
 
       document.getElementById('stat-total').textContent = total;
+      document.getElementById('stat-over').textContent = over;
       document.getElementById('stat-optimal').textContent = optimal;
       document.getElementById('stat-normal').textContent = normal;
       document.getElementById('stat-warning').textContent = warning;
@@ -1748,10 +1766,10 @@
       chartDistribution = new Chart(ctxDist, {
         type: 'doughnut',
         data: {
-          labels: ['Optimal (-15 s/d -22 dBm)', 'Normal (-22 s/d -25)', 'Waspada (-25 s/d -27)', 'Kritis/LOS (< -27)'],
+          labels: ['Terlalu Kuat (> -15 dBm)', 'Optimal (-15 s/d -22 dBm)', 'Normal (-22 s/d -25)', 'Waspada (-25 s/d -27)', 'Kritis/LOS (< -27)'],
           datasets: [{
-            data: [0, 0, 0, 0],
-            backgroundColor: ['#34d399', '#22d3ee', '#fbbf24', '#f43f5e'],
+            data: [0, 0, 0, 0, 0],
+            backgroundColor: ['#e879f9', '#34d399', '#22d3ee', '#fbbf24', '#f43f5e'],
             borderColor: '#0f172a',
             borderWidth: 2,
             hoverOffset: 4
@@ -1818,15 +1836,16 @@
       if (!chartDistribution || !chartOdpHealth) return;
 
       // Update Donut
-      let optimal = 0, normal = 0, warning = 0, critical = 0;
+      let over = 0, optimal = 0, normal = 0, warning = 0, critical = 0;
       clients.forEach(c => {
         const st = categorizeRedaman(c.rxPower);
-        if (st === "OPTIMAL") optimal++;
+        if (st === "OVERPOWER") over++;
+        else if (st === "OPTIMAL") optimal++;
         else if (st === "NORMAL") normal++;
         else if (st === "WARNING") warning++;
         else critical++;
       });
-      chartDistribution.data.datasets[0].data = [optimal, normal, warning, critical];
+      chartDistribution.data.datasets[0].data = [over, optimal, normal, warning, critical];
       chartDistribution.update();
 
       // Update ODP Averages
@@ -1841,6 +1860,7 @@
       const odpLabels = Object.keys(odpMap).sort();
       const odpAverages = odpLabels.map(k => odpMap[k].sum / odpMap[k].count);
       const bgColors = odpAverages.map(avg => {
+        if (avg > -15) return '#e879f9';
         if (avg > -22) return '#34d399';
         if (avg > -25) return '#22d3ee';
         if (avg > -27) return '#fbbf24';
@@ -1937,7 +1957,12 @@
 
       // Status check
       const status = categorizeRedaman(rxExpected);
-      if (status === "OPTIMAL") {
+      if (status === "OVERPOWER") {
+        rxValElem.className = "text-3xl sm:text-4xl font-extrabold font-mono tracking-tight text-fuchsia-400";
+        rxBox.className = "p-4 rounded-xl border border-fuchsia-500/30 bg-fuchsia-950/20 text-center";
+        badgeElem.className = "mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20";
+        badgeElem.innerHTML = `<span class="w-2 h-2 rounded-full bg-fuchsia-400"></span> TERLALU KUAT (PERLU ATENUATOR)`;
+      } else if (status === "OPTIMAL") {
         rxValElem.className = "text-3xl sm:text-4xl font-extrabold font-mono tracking-tight text-emerald-400";
         rxBox.className = "p-4 rounded-xl border border-emerald-500/30 bg-emerald-950/20 text-center";
         badgeElem.className = "mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
@@ -1992,7 +2017,11 @@
 
       resElem.textContent = finalRx.toFixed(2) + ' dBm';
       const st = categorizeRedaman(finalRx);
-      if (st === "OPTIMAL") {
+      if (st === "OVERPOWER") {
+        resElem.className = "text-3xl font-extrabold font-mono text-fuchsia-400 mt-1";
+        stElem.textContent = "Terlalu kuat - Tambahkan atenuator atau periksa rasio splitter";
+        stElem.className = "text-xs text-fuchsia-400 font-semibold";
+      } else if (st === "OPTIMAL") {
         resElem.className = "text-3xl font-extrabold font-mono text-emerald-400 mt-1";
         stElem.textContent = "Kondisi Prima & Sangat Ideal (GPON Optimal)";
         stElem.className = "text-xs text-emerald-400 font-medium";
@@ -2310,7 +2339,10 @@
       document.getElementById('detail-sn').textContent = client.sn;
 
       const diagElem = document.getElementById('detail-diagnostics');
-      if (liveStatus === "OPTIMAL") {
+      if (liveStatus === "OVERPOWER") {
+        diagElem.className = "p-3.5 rounded-lg bg-fuchsia-500/10 border border-fuchsia-500/20 text-xs text-fuchsia-300";
+        diagElem.textContent = "Sinyal Terlalu Kuat (> -15 dBm): daya optik melebihi rentang kerja ideal dan berisiko membuat receiver ONT saturasi (gejala: sinkronisasi putus-nyambung, packet loss tinggi, suhu ONT naik). Periksa apakah splitter terpasang benar, atau tambahkan atenuator 5-10 dB di sisi ODP/roset. Pastikan juga pengukuran memakai OPM pada panjang gelombang 1490 nm.";
+      } else if (liveStatus === "OPTIMAL") {
         diagElem.className = "p-3.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300";
         diagElem.textContent = "Status Link Optik Prima: Redaman sangat ideal (-15 s/d -22 dBm). Layanan beroperasi dengan kapasitas penuh tanpa jitter.";
       } else if (liveStatus === "NORMAL") {

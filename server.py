@@ -161,7 +161,7 @@ async def lifespan(_app):
     yield
 
 
-app = FastAPI(title="OptiPulse NOC", version="1.4.0", lifespan=lifespan)
+app = FastAPI(title="OptiPulse NOC", version="1.4.1", lifespan=lifespan)
 
 # Aset offline (Tailwind & Chart.js) disajikan dari folder yang sama.
 app.mount(
