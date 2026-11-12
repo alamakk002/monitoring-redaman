@@ -48,33 +48,96 @@ pip install fastapi uvicorn netmiko
 ```
 
 ### 3. Konfigurasi IP OLT
-Buka file `server.py`, lalu sesuaikan konfigurasi IP, username, dan password OLT kantor Anda:
-```python
-OLT_DEVICE = {
-    "device_type": "zte_zxros",  # zte_zxros, huawei, cisco_ios
-    "host": "192.168.1.100",     # Ganti dengan IP OLT kantor Anda
-    "username": "admin",
-    "password": "password_asli_olt",
-    "port": 23                   # 23 (Telnet) atau 22 (SSH)
-}
+
+Cara paling aman: atur lewat environment variable sebelum menjalankan server (password tidak tersimpan di kode).
+
+**Windows (PowerShell):**
+```powershell
+$env:OLT_HOST="192.168.1.100"
+$env:OLT_USERNAME="admin"
+$env:OLT_PASSWORD="password_asli_olt"
+$env:OLT_PORT="23"
+$env:OLT_DEVICE_TYPE="zte_zxros"
+$env:OLT_COMMAND="show gpon onu detail-info gpon-olt_1/1/1"
 ```
+
+**Linux/macOS:**
+```bash
+export OLT_HOST=192.168.1.100
+export OLT_USERNAME=admin
+export OLT_PASSWORD=password_asli_olt
+export OLT_PORT=23
+export OLT_DEVICE_TYPE=zte_zxros
+export OLT_COMMAND="show gpon onu detail-info gpon-olt_1/1/1"
+```
+
+Alternatif cepat untuk uji coba: edit nilai default di `server.py` pada bagian `OLT_DEVICE`. Jangan commit password asli ke Git.
 
 ### 4. Menjalankan Server Backend
+
 Jalankan file backend melalui terminal/CMD:
 ```bash
-pip python server.py
+python server.py
 ```
 
+Server berjalan di `http://localhost:5000`. Cek dengan membuka `http://localhost:5000/health` — harus menampilkan `{"status":"ok",...}`.
+
 ### 5. Menghubungkan dari Perangkat Lain (HP / Laptop Teknisi)
+
 Agar HP atau laptop teknisi lain di kantor bisa membaca data OLT secara nirkabel:
-Hubungkan HP ke jaringan WiFi kantor yang sama dengan laptop server.
-Cek IP lokal laptop server dengan perintah ```ipconfig``` di terminal (misalnya didapat: ```192.168.1.25```).
-Ganti alamat tujuan di ```index.html``` agar mengarah ke IP laptop server:
+
+1. Hubungkan HP ke jaringan WiFi kantor yang sama dengan laptop server.
+2. Cek IP lokal laptop server dengan perintah `ipconfig` (misalnya didapat `192.168.1.25`).
+3. Arahkan aplikasi ke alamat tersebut **tanpa mengedit HTML**. Pilih salah satu cara:
+
+   **Cara A — dari Console browser (sekali per sesi):**
+   ```js
+   localStorage.setItem('optipulse_api_base', 'http://192.168.1.25:5000');
+   location.reload();
+   ```
+
+   **Cara B — sisipkan konfigurasi sebelum script aplikasi:**
+   ```html
+   <script>window.OPTIPULSE_API_BASE = 'http://192.168.1.25:5000';</script>
+   ```
+
+   **Cara C — query string:** buka `index.html?api=http://192.168.1.25:5000`
+   (aplikasi membaca parameter `api` dan menyimpannya di localStorage).
+
+4. Klik tombol **Cek Koneksi** di dashboard.
+
+### 6. Catatan Chrome Local Network Access (PNA)
+
+Saat website dibuka dari domain publik (GitHub Pages) lalu memanggil API di `localhost`/IP privat, Chrome memblokir request sampai pengguna memberi izin:
+
+> *Permission was denied for this request to access the `loopback` address space.*
+
+Yang perlu dilakukan:
+
+- Jalankan server dengan header CORS + `Access-Control-Allow-Private-Network: true` (sudah disertakan di `server.py`).
+- Saat Chrome menampilkan prompt izin akses jaringan lokal, pilih **Allow**.
+- Jika tidak ada prompt: buka `chrome://settings/content/localNetworkAccess` lalu izinkan situs tersebut.
+- Cara paling bebas masalah: akses aplikasi dari `http://localhost:8000/index.html` (bukan dari GitHub Pages) ketika memakai backend lokal.
+
+### 7. Cara Mengecek Alamat Backend yang Sedang Digunakan
+
+Buka Console browser (`F12`) lalu jalankan:
+```js
+localStorage.getItem('optipulse_api_base') || window.OPTIPULSE_API_BASE || 'http://localhost:5000'
 ```
-[http://192.168.1.25:5000/api/clients]
-(http://192.168.1.25:5000/api/clients)
-```
-### 6. Cara Mengecek Alamat Backend yang Sedang Digunakan ```index.html```
-Untuk memastikan alamat server OLT yang sedang dituju oleh website Anda:
-Lewat VS Code: Buka ```index.html```, tekan ```Ctrl + F```, lalu cari ```:5000```. Periksa apakah tertulis ```localhost:5000``` (server laptop sendiri) atau alamat IP (server di PC lain).
-Lewat Browser (Inspect Element): Buka website di browser, tekan ```F12```, buka tab Network, klik tombol "Cek Koneksi" di web, lalu klik baris ```clients``` untuk melihat alamat Request URL yang sedang dipanggil.
+
+Atau di tab **Network**, klik tombol **Cek Koneksi**, lalu lihat Request URL pada baris `clients`.
+
+### 8. Variabel Environment Backend
+
+| Variabel | Default | Keterangan |
+|---|---|---|
+| `OLT_DEVICE_TYPE` | `zte_zxros` | Tipe perangkat Netmiko (`zte_zxros`, `huawei`, `cisco_ios`, `generic`) |
+| `OLT_HOST` | `192.168.1.100` | IP OLT |
+| `OLT_USERNAME` | `admin` | Username OLT |
+| `OLT_PASSWORD` | `password_olt` | Password OLT |
+| `OLT_PORT` | `23` | Port Telnet/SSH |
+| `OLT_TIMEOUT` | `10` | Timeout koneksi (detik) |
+| `OLT_COMMAND` | `show gpon onu detail-info gpon-olt_1/1/1` | Perintah pembacaan ONT |
+| `OPTIPULSE_ALLOWED_ORIGINS` | `*` | Origin yang diizinkan, pisahkan dengan koma |
+| `PORT` | `5000` | Port server backend |
