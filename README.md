@@ -265,7 +265,9 @@ Lalu buka `http://localhost:5050`. Untuk `.exe`, ubah `PORT=5050` di `optipulse.
 
 **Windows SmartScreen memblokir .exe** — klik **More info → Run anyway**. File belum ditandatangani secara digital.
 
-**.exe langsung tertutup** — biasanya port sudah dipakai instance lain. Tutup jendela OptiPulse sebelumnya lewat Task Manager, atau ganti `PORT` di `optipulse.env`.
+**Klik dua kali .exe padahal aplikasi sudah jalan** — jendela baru akan menampilkan `OptiPulse NOC sudah berjalan` dan langsung membuka browser, lalu menutup diri. Ini normal; aplikasi hanya boleh punya satu server. Untuk mematikan aplikasi, tutup jendela server yang lama.
+
+**.exe langsung tertutup** — hanya terjadi bila port dipakai aplikasi **lain** (bukan OptiPulse). Jendela akan menampilkan pesan `Port 5000 sedang dipakai aplikasi lain` dan menunggu Enter. Tutup aplikasi tersebut, atau ubah `PORT=5050` di `optipulse.env`.
 
 **Data .exe tidak muncul di perangkat lain** — setiap `.exe` punya database sendiri. Jalankan `.exe` di satu PC saja, perangkat lain mengakses `http://IP-PC:5000`.
 

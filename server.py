@@ -161,7 +161,7 @@ async def lifespan(_app):
     yield
 
 
-app = FastAPI(title="OptiPulse NOC", version="1.3.0", lifespan=lifespan)
+app = FastAPI(title="OptiPulse NOC", version="1.4.0", lifespan=lifespan)
 
 # Aset offline (Tailwind & Chart.js) disajikan dari folder yang sama.
 app.mount(
@@ -394,8 +394,101 @@ def get_olt_clients():
         return {"error": str(error), "status": "OLT_UNREACHABLE"}
 
 
-if __name__ == "__main__":
+def is_our_server_running(port: str) -> bool:
+    """Cek apakah instance OptiPulse NOC sudah melayani port ini."""
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{port}/health", timeout=1.5
+        ) as response:
+            if response.status != 200:
+                return False
+            data = json.loads(response.read().decode("utf-8"))
+        return isinstance(data, dict) and data.get("service") == "optipulse-noc-api"
+    except Exception:
+        return False
+
+
+def port_in_use(port: int) -> bool:
+    """Cek apakah ada aplikasi yang menerima koneksi di port ini."""
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    probe.settimeout(1.0)
+    try:
+        return probe.connect_ex(("127.0.0.1", port)) == 0
+    finally:
+        probe.close()
+
+
+def pause_if_frozen() -> None:
+    """Beri kesempatan membaca pesan error sebelum jendela .exe tertutup."""
+    if not getattr(sys, "frozen", False):
+        return
+    try:
+        input("Tekan Enter untuk menutup jendela ini...")
+    except EOFError:
+        pass
+
+
+def run_from_cli() -> int:
+    import time
+    import webbrowser
+
     import uvicorn
 
-    # host 0.0.0.0 agar bisa diakses dari perangkat lain di WiFi kantor
-    uvicorn.run(app, host=env("HOST", "0.0.0.0"), port=int(env("PORT", "5000")))
+    port = env("PORT", "5000")
+    default_open = "1" if getattr(sys, "frozen", False) else "0"
+    open_browser = os.getenv("OPTIPULSE_OPEN_BROWSER", default_open) != "0"
+
+    # Klik ganda saat aplikasi sudah berjalan: jangan gagal bind, cukup buka browser.
+    if is_our_server_running(port):
+        print(f"OptiPulse NOC sudah berjalan di http://localhost:{port}")
+        if open_browser:
+            print("Membuka browser...")
+            webbrowser.open(f"http://localhost:{port}")
+        else:
+            print("Tidak perlu dijalankan lagi.")
+        time.sleep(1.2)
+        return 0
+
+    if port_in_use(int(port)):
+        print()
+        print("=" * 64)
+        print("  OptiPulse NOC gagal dijalankan.")
+        print(f"  Port {port} sedang dipakai aplikasi lain.")
+        print("  Tutup aplikasi tersebut, atau ubah PORT di optipulse.env.")
+        print("=" * 64)
+        pause_if_frozen()
+        return 1
+
+    try:
+        # host 0.0.0.0 agar bisa diakses dari perangkat lain di WiFi kantor
+        uvicorn.run(app, host=env("HOST", "0.0.0.0"), port=int(port))
+    except SystemExit as exc:
+        code = exc.code if isinstance(exc.code, int) else 1
+        if code == 0:
+            return 0
+        print()
+        print("=" * 64)
+        if is_our_server_running(port):
+            print("  OptiPulse NOC sudah berjalan.")
+            print(f"  Buka http://localhost:{port}")
+            if open_browser:
+                webbrowser.open(f"http://localhost:{port}")
+        else:
+            print("  OptiPulse NOC gagal dijalankan.")
+            print(f"  Port {port} kemungkinan dipakai aplikasi lain.")
+            print("  Tutup aplikasi tersebut, atau ubah PORT di optipulse.env.")
+        print("=" * 64)
+        pause_if_frozen()
+        return code
+    except Exception as exc:  # noqa: BLE001 - tampilkan pesan ramah ke pengguna
+        print(f"OptiPulse NOC gagal dijalankan: {exc}")
+        pause_if_frozen()
+        return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(run_from_cli())
