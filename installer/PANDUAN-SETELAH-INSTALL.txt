@@ -1,0 +1,40 @@
+OptiPulse NOC sudah terpasang.
+==================================================
+
+1. Aplikasi akan terbuka otomatis di browser pada alamat:
+   http://localhost:5000
+
+   Jendela hitam yang muncul adalah servernya. Jangan ditutup selama
+   aplikasi dipakai. Tutup jendela tersebut untuk menghentikan aplikasi.
+
+2. Mengatur koneksi OLT:
+   - Buka folder instalasi (biasanya):
+     %LOCALAPPDATA%\Programs\OptiPulse NOC
+   - Salin file "optipulse.env.example" menjadi "optipulse.env".
+   - Buka dengan Notepad dan isi OLT_HOST, OLT_USERNAME, OLT_PASSWORD,
+     dan OLT_PORT sesuai OLT Anda.
+   - Tutup lalu jalankan ulang OptiPulse NOC.
+
+3. Jika Windows Firewall bertanya saat pertama dijalankan:
+   centang "Private networks" lalu klik "Allow access".
+
+4. Membuka dari HP / laptop lain:
+   - Cari IP PC ini dengan perintah: ipconfig
+   - Di HP buka: http://IP-PC:5000  (contoh http://172.23.108.210:5000)
+   - HP dan PC harus berada di jaringan yang sama.
+
+5. Data klien disimpan di:
+   %LOCALAPPDATA%\OptiPulse NOC\optipulse.db
+
+   Data TIDAK ikut terhapus saat aplikasi di-uninstall. Hapus folder
+   tersebut secara manual bila data juga ingin dihapus.
+
+6. Menjalankan otomatis saat login:
+   - Klik kanan shortcut OptiPulse NOC, pilih "Open file location".
+   - Tekan Win+R, ketik: shell:startup
+   - Salin shortcut OptiPulse NOC ke folder yang terbuka.
+   - Bila tidak ingin browser terbuka setiap login, tambahkan baris
+     OPTIPULSE_OPEN_BROWSER=0 pada optipulse.env
+
+Catatan: aplikasi ini belum ditandatangani secara digital. Jika Windows
+SmartScreen muncul, pilih "More info" lalu "Run anyway".

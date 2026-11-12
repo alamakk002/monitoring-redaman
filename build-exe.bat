@@ -23,6 +23,7 @@ if errorlevel 1 (
 
 python -m PyInstaller --noconfirm --clean --onefile ^
     --name "OptiPulse-NOC" ^
+    --icon "assets\optipulse.ico" ^
     --add-data "index.html;." ^
     --add-data "vendor;vendor" ^
     --collect-all netmiko ^
@@ -31,7 +32,26 @@ python -m PyInstaller --noconfirm --clean --onefile ^
 if errorlevel 1 goto :error
 
 echo.
-echo Selesai. File aplikasi: dist\OptiPulse-NOC.exe
+echo Aplikasi: dist\OptiPulse-NOC.exe
+
+set "ISCC=%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe"
+if not exist "%ISCC%" set "ISCC=%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
+if not exist "%ISCC%" set "ISCC=%ProgramFiles%\Inno Setup 6\ISCC.exe"
+
+if exist "%ISCC%" (
+    echo.
+    echo Membuat installer...
+    "%ISCC%" installer.iss
+    if errorlevel 1 goto :error
+    echo Installer: dist\OptiPulse-NOC-Setup.exe
+) else (
+    echo.
+    echo Inno Setup tidak ditemukan. Installer tidak dibuat.
+    echo Unduh dari https://jrsoftware.org/isdl.php lalu jalankan build-exe.bat lagi.
+)
+
+echo.
+echo Selesai.
 pause
 exit /b 0
 
