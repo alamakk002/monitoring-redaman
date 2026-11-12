@@ -4,6 +4,8 @@ Aplikasi pemantauan kualitas jaringan FTTH (Fiber to the Home) dan kalkulator re
 
 🌐 **Demo (data simulasi):** [https://alamakk002.github.io/monitoring-redaman/](https://alamakk002.github.io/monitoring-redaman/)
 
+⬇️ **Unduh aplikasi Windows:** [Releases — OptiPulse-NOC-Setup.exe](https://github.com/alamakk002/monitoring-redaman/releases/latest) (± 30 MB, tanpa perlu Python)
+
 ---
 
 ## 📌 Fitur Utama
