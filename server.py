@@ -2,6 +2,7 @@ import json
 import os
 import socket
 import sqlite3
+import sys
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,9 +27,89 @@ def get_lan_ip() -> str:
         sock.close()
 
 
-BASE_DIR = Path(__file__).resolve().parent
+def resource_dir() -> Path:
+    """Folder aset (index.html, vendor). Saat dibungkus PyInstaller, ada di _MEIPASS."""
+    if getattr(sys, "frozen", False):
+        return Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
+    return Path(__file__).resolve().parent
+
+
+def data_dir() -> Path:
+    """Folder data yang bisa ditulis.
+
+    Saat dijalankan sebagai .exe, jangan simpan database di folder Program Files
+    (biasanya tidak bisa ditulis). Gunakan folder data pengguna.
+    """
+    override = os.getenv("OPTIPULSE_DATA_DIR")
+    if override:
+        folder = Path(override)
+    elif getattr(sys, "frozen", False):
+        base = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA") or str(Path.home())
+        folder = Path(base) / "OptiPulse NOC"
+    else:
+        folder = Path(__file__).resolve().parent
+
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
+BASE_DIR = resource_dir()
 INDEX_FILE = BASE_DIR / "index.html"
-DB_FILE = Path(os.getenv("OPTIPULSE_DB", str(BASE_DIR / "optipulse.db")))
+DATA_DIR = data_dir()
+
+
+def load_env_file() -> None:
+    """Baca optipulse.env di samping .exe (atau folder aplikasi) bila ada.
+
+    Memudahkan pemakaian .exe tanpa mengatur environment variable Windows.
+    Nilai yang sudah ada di environment tidak ditimpa.
+    """
+    if getattr(sys, "frozen", False):
+        primary = Path(sys.executable).resolve().parent / "optipulse.env"
+    else:
+        primary = Path(__file__).resolve().parent / "optipulse.env"
+
+    for file in (primary, DATA_DIR / "optipulse.env"):
+        if not file.is_file():
+            continue
+        try:
+            lines = file.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            continue
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
+
+
+load_env_file()
+DB_FILE = Path(os.getenv("OPTIPULSE_DB", str(DATA_DIR / "optipulse.db")))
+
+
+def open_browser_later(port: str) -> None:
+    """Buka browser otomatis saat dijalankan sebagai .exe (kecuali dimatikan)."""
+    if not getattr(sys, "frozen", False):
+        return
+    if os.getenv("OPTIPULSE_OPEN_BROWSER", "1") == "0":
+        return
+
+    import threading
+    import time
+    import webbrowser
+
+    def _open():
+        time.sleep(1.5)
+        try:
+            webbrowser.open(f"http://localhost:{port}")
+        except Exception:
+            pass
+
+    threading.Thread(target=_open, daemon=True).start()
 
 
 def db_connect() -> sqlite3.Connection:
@@ -71,8 +152,12 @@ async def lifespan(_app):
     print(f"  Dari HP / laptop   : http://{lan_ip}:{port}")
     print(f"  Penyimpanan data   : {DB_FILE}")
     print("  Pastikan izin firewall Windows aktif untuk jaringan Private.")
-    print("  Hentikan server    : Ctrl + C")
+    if getattr(sys, "frozen", False):
+        print("  Hentikan aplikasi  : tutup jendela ini")
+    else:
+        print("  Hentikan server    : Ctrl + C")
     print("=" * 64, flush=True)
+    open_browser_later(port)
     yield
 
 

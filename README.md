@@ -28,8 +28,9 @@ Aplikasi pemantauan kualitas jaringan FTTH (Fiber to the Home) dan kalkulator re
 | Cara | Cocok untuk | Mode live OLT |
 |---|---|---|
 | **Server LAN** (disarankan) | Operasional NOC, dipakai beberapa teknisi | ✅ Ya, satu origin |
+| **Aplikasi .exe** (Windows) | Laptop NOC tanpa Python, instalasi cepat | ✅ Ya, satu origin |
 | **GitHub Pages** | Demo/portofolio, tanpa backend | ❌ Tidak |
-| **Aplikasi desktop** | Satu laptop, tanpa browser | Perlu pengemasan terpisah |
+| **Aplikasi desktop** | Jendela native tanpa browser | Belum tersedia |
 
 > Untuk pemakaian sehari-hari, jalankan lewat `server.py`. UI dan API disajikan dari alamat yang sama sehingga tidak ada masalah CORS, *mixed content*, atau izin Local Network Access.
 
@@ -132,6 +133,64 @@ File database **tidak** ikut di-commit (lihat `.gitignore`). Mode demo di GitHub
 
 ---
 
+## C. Aplikasi .exe (Windows)
+
+Versi siap pakai dibangun ke `dist\OptiPulse-NOC.exe` (± 29 MB). File ini **tidak** di-commit; bangun ulang kapan saja dengan `build-exe.bat`.
+
+### 1. Cara menjalankan
+
+1. Salin `OptiPulse-NOC.exe` ke folder mana pun (mis. `D:\OptiPulse NOC`).
+2. Klik dua kali file tersebut.
+3. Browser terbuka otomatis ke `http://localhost:5000`. Alamat untuk HP/laptop lain tampil di jendela hitam.
+4. **Jangan tutup jendela hitam** selama aplikasi dipakai — jendela itu adalah servernya. Tutup jendela (atau `Ctrl + C`) untuk menghentikan aplikasi.
+
+Tidak perlu Python, pip, atau koneksi internet.
+
+### 2. Konfigurasi OLT
+
+Buat file `optipulse.env` di folder yang sama dengan `.exe` (contoh lengkap: `optipulse.env.example`):
+
+```ini
+OLT_HOST=192.168.1.100
+OLT_USERNAME=admin
+OLT_PASSWORD=password_asli
+OLT_PORT=23
+```
+
+Tanpa file ini, aplikasi tetap berjalan dalam mode demo. Environment variable Windows juga tetap didahulukan.
+
+### 3. Lokasi data
+
+| Item | Lokasi |
+|---|---|
+| Database bersama | `%LOCALAPPDATA%\OptiPulse NOC\optipulse.db` |
+| Konfigurasi (opsional) | `optipulse.env` di samping `.exe`, atau di folder data di atas |
+
+Menghapus aplikasi = hapus file `.exe` dan folder `%LOCALAPPDATA%\OptiPulse NOC` bila datanya juga ingin dihapus.
+
+### 4. Memasang di beberapa perangkat
+
+- Menyalin `.exe` ke 5 laptop berarti ada **5 database terpisah** — data tidak otomatis sama.
+- Untuk data yang sama, jalankan `.exe` hanya di **satu** PC (jadikan server), lalu perangkat lain membuka `http://IP-PC-ITU:5000` lewat browser. Ini cara yang disarankan.
+- Jangan menaruh `optipulse.db` di folder jaringan (SMB); SQLite tidak dirancang untuk diakses beberapa proses sekaligus lewat share.
+
+### 5. Membangun ulang .exe
+
+```bat
+build-exe.bat
+```
+
+PyInstaller dipasang otomatis bila belum ada (butuh internet sekali saat build). Hasilnya `dist\OptiPulse-NOC.exe`. Build harus dilakukan di Windows; untuk Linux/macOS perlu build terpisah di sistem masing-masing.
+
+### 6. Catatan Windows
+
+- File belum ditandatangani (unsigned), jadi SmartScreen bisa menampilkan peringatan: **More info → Run anyway**.
+- Saat pertama dijalankan, Windows Firewall mungkin bertanya. Pilih **Allow** untuk jaringan **Private** agar bisa diakses dari HP/laptop lain.
+- Agar jalan otomatis saat login: buat *shortcut* `.exe` lalu letakkan di `shell:startup`. Tambahkan `OPTIPULSE_OPEN_BROWSER=0` di `optipulse.env` bila tidak ingin browser terbuka setiap login.
+- Port 5000 dipakai aplikasi lain? Ubah `PORT=5050` di `optipulse.env`.
+
+---
+
 ## A. Demo via GitHub Pages
 
 Halaman publik hanya untuk memperlihatkan tampilan dengan data simulasi.
@@ -158,7 +217,9 @@ Jika tetap ingin mencoba demo + backend lokal, jalankan server lalu buka `index.
 | `OLT_TIMEOUT` | `10` | Timeout koneksi (detik) |
 | `OLT_COMMAND` | `show gpon onu detail-info gpon-olt_1/1/1` | Perintah pembacaan ONT |
 | `OPTIPULSE_ALLOWED_ORIGINS` | `*` | Origin CORS yang diizinkan, pisahkan dengan koma |
-| `OPTIPULSE_DB` | `optipulse.db` (folder aplikasi) | Lokasi file SQLite penyimpan data bersama |
+| `OPTIPULSE_DB` | `optipulse.db` di folder data | Lokasi file SQLite penyimpan data bersama |
+| `OPTIPULSE_DATA_DIR` | folder aplikasi / `%LOCALAPPDATA%\OptiPulse NOC` (.exe) | Folder data yang bisa ditulis |
+| `OPTIPULSE_OPEN_BROWSER` | `1` (khusus .exe) | `0` untuk tidak membuka browser otomatis |
 
 ---
 
@@ -171,7 +232,13 @@ Jika tetap ingin mencoba demo + backend lokal, jalankan server lalu buka `index.
 $env:PORT="5050"
 python server.py
 ```
-Lalu buka `http://localhost:5050`.
+Lalu buka `http://localhost:5050`. Untuk `.exe`, ubah `PORT=5050` di `optipulse.env`.
+
+**Windows SmartScreen memblokir .exe** — klik **More info → Run anyway**. File belum ditandatangani secara digital.
+
+**.exe langsung tertutup** — biasanya port sudah dipakai instance lain. Tutup jendela OptiPulse sebelumnya lewat Task Manager, atau ganti `PORT` di `optipulse.env`.
+
+**Data .exe tidak muncul di perangkat lain** — setiap `.exe` punya database sendiri. Jalankan `.exe` di satu PC saja, perangkat lain mengakses `http://IP-PC:5000`.
 
 **HP tidak bisa membuka halaman** — pastikan satu jaringan, firewall mengizinkan port 5000, dan IP yang dipakai benar.
 
@@ -200,10 +267,13 @@ window.OPTIPULSE_SAME_ORIGIN === true ? location.origin
 ## 📂 Struktur File
 
 ```
-index.html          # UI aplikasi (Tailwind, Chart.js, font lokal di vendor/)
-server.py           # FastAPI: menyajikan UI, API OLT, dan /api/state
-start-optipulse.bat # Menjalankan server dengan sekali klik (Windows)
-README.md           # Dokumentasi ini
-vendor/             # Tailwind, Chart.js, dan font untuk pemakaian offline
-optipulse.db        # Database SQLite data bersama (dibuat otomatis, tidak di-commit)
+index.html             # UI aplikasi (Tailwind, Chart.js, font lokal di vendor/)
+server.py              # FastAPI: menyajikan UI, API OLT, dan /api/state
+start-optipulse.bat    # Menjalankan server Python dengan sekali klik (Windows)
+build-exe.bat          # Membangun dist\OptiPulse-NOC.exe dengan PyInstaller
+optipulse.env.example  # Contoh konfigurasi OLT untuk server / .exe
+README.md              # Dokumentasi ini
+vendor/                # Tailwind, Chart.js, dan font untuk pemakaian offline
+optipulse.db           # Database SQLite data bersama (dibuat otomatis, tidak di-commit)
+dist/                  # Hasil build .exe (tidak di-commit)
 ```
