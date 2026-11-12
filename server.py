@@ -1,12 +1,46 @@
 import os
-import re
+import socket
+from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, Response
 from netmiko import ConnectHandler
 from starlette.middleware.base import BaseHTTPMiddleware
 
-app = FastAPI(title="OptiPulse NOC API", version="1.1.0")
+
+def get_lan_ip() -> str:
+    """Perkirakan IP LAN utama tanpa mengirim paket (UDP connect)."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.connect(("8.8.8.8", 80))
+        return sock.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+    finally:
+        sock.close()
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    # Banner dicetak saat server benar-benar siap menerima koneksi.
+    port = os.getenv("PORT", "5000")
+    lan_ip = get_lan_ip()
+    print("=" * 64)
+    print("  OptiPulse NOC siap dijalankan")
+    print(f"  Di laptop ini      : http://localhost:{port}")
+    print(f"  Dari HP / laptop   : http://{lan_ip}:{port}")
+    print("  Pastikan izin firewall Windows aktif untuk jaringan Private.")
+    print("  Hentikan server    : Ctrl + C")
+    print("=" * 64, flush=True)
+    yield
+
+
+app = FastAPI(title="OptiPulse NOC", version="1.2.0", lifespan=lifespan)
+
+BASE_DIR = Path(__file__).resolve().parent
+INDEX_FILE = BASE_DIR / "index.html"
 
 # Origin yang diizinkan. Default "*" agar bisa dibuka dari GitHub Pages / HP.
 # Contoh: OPTIPULSE_ALLOWED_ORIGINS="https://alamakk002.github.io,http://localhost:8000"
@@ -64,6 +98,44 @@ OLT_DEVICE = {
 OLT_COMMAND = env("OLT_COMMAND", "show gpon onu detail-info gpon-olt_1/1/1")
 
 
+@app.get("/", response_class=HTMLResponse)
+@app.get("/index.html", response_class=HTMLResponse)
+def serve_app():
+    """Sajikan UI dan API dari origin yang sama.
+
+    Dengan begitu browser tidak perlu CORS/PNA dan aplikasi bisa dibuka
+    dari HP/laptop lain lewat alamat IP server.
+    """
+    try:
+        html = INDEX_FILE.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return HTMLResponse(
+            "<h1>index.html tidak ditemukan</h1>"
+            "<p>Letakkan server.py dan index.html di folder yang sama.</p>",
+            status_code=500,
+        )
+
+    # Beri tahu frontend bahwa API berada di origin yang sama.
+    marker = "  <script>window.OPTIPULSE_SAME_ORIGIN = true;</script>\n</head>"
+    if "</head>" in html:
+        html = html.replace("</head>", marker, 1)
+
+    return HTMLResponse(
+        html,
+        headers={
+            "Cache-Control": "no-store, max-age=0",
+            "X-Content-Type-Options": "nosniff",
+            "Referrer-Policy": "same-origin",
+        },
+    )
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    # Favicon utama memakai SVG inline di index.html.
+    return Response(status_code=204)
+
+
 @app.get("/health")
 def health():
     """Endpoint ringan untuk mengecek backend hidup tanpa menyentuh OLT."""
@@ -107,5 +179,5 @@ def get_olt_clients():
 if __name__ == "__main__":
     import uvicorn
 
-    # host 0.0.0.0 agar bisa diakses dari HP di WiFi yang sama
-    uvicorn.run(app, host="0.0.0.0", port=int(env("PORT", "5000")))
+    # host 0.0.0.0 agar bisa diakses dari perangkat lain di WiFi kantor
+    uvicorn.run(app, host=env("HOST", "0.0.0.0"), port=int(env("PORT", "5000")))

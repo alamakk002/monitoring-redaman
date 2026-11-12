@@ -988,7 +988,10 @@
 
     // Base URL API dapat diubah tanpa mengedit kode:
     //   window.OPTIPULSE_API_BASE = 'https://noc.example.com';
-    // atau lewat localStorage: optipulse_api_base
+    //   ?api=https://noc.example.com
+    //   localStorage.setItem('optipulse_api_base', 'https://noc.example.com')
+    // Saat UI disajikan oleh server.py, penanda OPTIPULSE_SAME_ORIGIN membuat
+    // aplikasi memanggil API di origin yang sama (tanpa CORS / PNA).
     function getApiBase() {
       try {
         const fromQuery = new URLSearchParams(window.location.search).get('api');
@@ -997,9 +1000,15 @@
           try { localStorage.setItem('optipulse_api_base', clean); } catch (e) { /* ignore */ }
           return clean;
         }
-        const configured = (typeof window !== 'undefined' && window.OPTIPULSE_API_BASE)
-          || localStorage.getItem('optipulse_api_base')
-          || DEFAULT_API_BASE;
+
+        const explicit = (typeof window !== 'undefined' && window.OPTIPULSE_API_BASE) || '';
+        if (explicit) return String(explicit).replace(/\/+$/, '');
+
+        if (typeof window !== 'undefined' && window.OPTIPULSE_SAME_ORIGIN === true) {
+          return window.location.origin.replace(/\/+$/, '');
+        }
+
+        const configured = localStorage.getItem('optipulse_api_base') || DEFAULT_API_BASE;
         return String(configured).replace(/\/+$/, '');
       } catch (e) {
         return DEFAULT_API_BASE;
