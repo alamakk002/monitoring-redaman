@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Database lokal (data klien) — jangan di-commit
+optipulse.db
+optipulse.db-wal
+optipulse.db-shm

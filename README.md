@@ -116,13 +116,17 @@ New-NetFirewallRule -DisplayName "OptiPulse NOC" -Direction Inbound -LocalPort 5
 
 ### 8. Catatan Penyimpanan Data
 
-Saat ini data klien dan log disimpan di `localStorage` **masing-masing browser**. Artinya:
+Data klien dan log sekarang **dibagi antarperangkat**:
 
-- Data di laptop A tidak otomatis muncul di HP B.
-- Menghapus data browser akan menghapus data aplikasi.
-- Reset Data mengembalikan data demo.
+- Server menyimpan data di `optipulse.db` (SQLite) melalui endpoint `/api/state`.
+- Laptop, HP, atau komputer lain yang membuka alamat server yang sama akan melihat data yang sama.
+- Perubahan dari perangkat lain otomatis diambil tiap 15 detik (muncul notifikasi "Data diperbarui dari perangkat lain").
+- `localStorage` tetap dipakai sebagai cadangan saat server mati/terputus, sehingga tampilan tidak kosong.
+- Data hanya diperbarui ke server saat mode **DEMO**, supaya hasil pembacaan OLT di mode **LIVE** tidak menimpa data operasional bersama.
+- Menghapus data browser tidak lagi menghapus data bersama; data tetap ada di `optipulse.db`.
+- Untuk mengosongkan data bersama, hentikan server lalu hapus `optipulse.db` dan `optipulse.db-wal` / `optipulse.db-shm` (dibuat ulang otomatis saat server dijalankan).
 
-Untuk data yang sama di semua perangkat, langkah berikutnya adalah menyimpan data di backend (SQLite) — belum termasuk dalam versi ini.
+File database **tidak** ikut di-commit (lihat `.gitignore`). Mode demo di GitHub Pages tetap memakai `localStorage` masing-masing browser karena tidak ada backend.
 
 ---
 
@@ -152,6 +156,7 @@ Jika tetap ingin mencoba demo + backend lokal, jalankan server lalu buka `index.
 | `OLT_TIMEOUT` | `10` | Timeout koneksi (detik) |
 | `OLT_COMMAND` | `show gpon onu detail-info gpon-olt_1/1/1` | Perintah pembacaan ONT |
 | `OPTIPULSE_ALLOWED_ORIGINS` | `*` | Origin CORS yang diizinkan, pisahkan dengan koma |
+| `OPTIPULSE_DB` | `optipulse.db` (folder aplikasi) | Lokasi file SQLite penyimpan data bersama |
 
 ---
 
@@ -194,7 +199,8 @@ window.OPTIPULSE_SAME_ORIGIN === true ? location.origin
 
 ```
 index.html          # UI aplikasi (Tailwind + Chart.js via CDN)
-server.py           # FastAPI: menyajikan UI + API OLT
+server.py           # FastAPI: menyajikan UI, API OLT, dan /api/state
 start-optipulse.bat # Menjalankan server dengan sekali klik (Windows)
 README.md           # Dokumentasi ini
+optipulse.db        # Database SQLite data bersama (dibuat otomatis, tidak di-commit)
 ```

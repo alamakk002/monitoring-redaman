@@ -981,6 +981,12 @@
     // Penanda bila data localStorage dipulihkan karena formatnya tidak valid
     let stateRecovered = false;
 
+    // Sinkronisasi data bersama lewat /api/state (SQLite di server)
+    let serverStateUpdatedAt = null;
+    let saveStateTimer = null;
+    let statePollTimer = null;
+    let isServerSaveInFlight = false;
+
     // ==========================================
     // KONFIGURASI API & HELPER KEAMANAN
     // ==========================================
@@ -1266,13 +1272,146 @@
       updateCharts();
     }
 
-    function saveState() {
+    function persistLocalState() {
       try {
         localStorage.setItem('optipulse_clients', JSON.stringify(clients));
         localStorage.setItem('optipulse_alerts', JSON.stringify(alerts));
       } catch (e) {
         console.warn('Failed to save to localStorage', e);
       }
+    }
+
+    // Simpan ke localStorage (langsung) dan ke server (dijadwalkan).
+    function saveState() {
+      persistLocalState();
+      scheduleServerSave();
+    }
+
+    // ==========================================
+    // SINKRONISASI DATA BERSAMA (SERVER / SQLITE)
+    // ==========================================
+    async function fetchServerState() {
+      try {
+        const response = await fetch(`${getApiBase()}/api/state`, {
+          headers: { 'Accept': 'application/json' },
+          cache: 'no-store'
+        });
+        if (!response.ok) return null;
+        const data = await response.json();
+        return (data && typeof data === 'object') ? data : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function applyServerState(data, render) {
+      if (!data) return false;
+      if (data.updatedAt) serverStateUpdatedAt = data.updatedAt;
+
+      let changed = false;
+      if (currentMode === 'DEMO' && Array.isArray(data.clients)) {
+        const normalized = normalizeClients(data.clients);
+        if (normalized !== null) {
+          clients = normalized;
+          changed = true;
+        }
+      }
+      if (Array.isArray(data.alerts)) {
+        const normalizedAlerts = normalizeAlerts(data.alerts);
+        if (normalizedAlerts !== null) {
+          alerts = normalizedAlerts;
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        persistLocalState();
+        if (render) {
+          updateKPIs();
+          populateODPFilter();
+          renderClientTable();
+          renderAlertLogs();
+          updateCharts();
+        }
+      }
+      return changed;
+    }
+
+    async function pushStateToServer() {
+      if (isServerSaveInFlight) {
+        scheduleServerSave();
+        return;
+      }
+      isServerSaveInFlight = true;
+      try {
+        const payload = { alerts };
+        // Jangan menimpa data demo bersama dengan snapshot LIVE dari OLT.
+        if (currentMode === 'DEMO') payload.clients = clients;
+
+        const response = await fetch(`${getApiBase()}/api/state`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (response.ok) {
+          const data = await response.json().catch(() => null);
+          if (data && data.updatedAt) serverStateUpdatedAt = data.updatedAt;
+        }
+      } catch (e) {
+        // Backend mati/offline: localStorage tetap menjadi cadangan.
+      } finally {
+        isServerSaveInFlight = false;
+      }
+    }
+
+    function scheduleServerSave() {
+      if (saveStateTimer) clearTimeout(saveStateTimer);
+      saveStateTimer = setTimeout(() => {
+        saveStateTimer = null;
+        pushStateToServer();
+      }, 600);
+    }
+
+    // Muat data dari server saat aplikasi dibuka. Kalau server masih kosong,
+    // state perangkat ini yang menjadi data awal.
+    async function hydrateStateFromServer() {
+      const data = await fetchServerState();
+      if (!data) return;
+
+      if (!data.updatedAt) {
+        await pushStateToServer();
+        return;
+      }
+
+      const hadClients = Array.isArray(data.clients);
+      const hadAlerts = Array.isArray(data.alerts);
+      applyServerState(data, true);
+
+      if ((currentMode === 'DEMO' && !hadClients) || !hadAlerts) {
+        await pushStateToServer();
+      }
+    }
+
+    // Perangkat lain bisa mengubah data; ambil pembaruan tiap 15 detik.
+    function startStatePolling() {
+      if (statePollTimer) clearInterval(statePollTimer);
+      statePollTimer = setInterval(async () => {
+        if (document.hidden || isServerSaveInFlight) return;
+
+        const modalOpen = ['modal-client', 'modal-detail', 'modal-ping'].some(id => {
+          const el = document.getElementById(id);
+          return el && !el.classList.contains('hidden');
+        });
+        if (modalOpen) return;
+
+        const data = await fetchServerState();
+        if (!data || !data.updatedAt) return;
+        if (serverStateUpdatedAt && data.updatedAt <= serverStateUpdatedAt) return;
+
+        if (applyServerState(data, true)) {
+          showToast('Data diperbarui dari perangkat lain', 'info');
+        }
+      }, 15000);
     }
 
     // Helper: Categorize Redaman Status
@@ -2488,8 +2627,13 @@
 
       if (stateRecovered) {
         showToast("Data lokal tidak valid dan telah dipulihkan ke data demo", "warning");
-        saveState();
+        // Jangan langsung menimpa data server dengan data pemulihan.
+        persistLocalState();
       }
+
+      // Ambil data bersama dari server, lalu pantau perubahan perangkat lain.
+      hydrateStateFromServer();
+      startStatePolling();
 
       // Check OLT connection on startup (asynchronously without blocking UI)
       checkNetworkConnection(false);

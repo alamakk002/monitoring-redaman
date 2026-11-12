@@ -1,9 +1,12 @@
+import json
 import os
 import socket
+import sqlite3
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import Body, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, Response
 from netmiko import ConnectHandler
@@ -22,25 +25,57 @@ def get_lan_ip() -> str:
         sock.close()
 
 
+BASE_DIR = Path(__file__).resolve().parent
+INDEX_FILE = BASE_DIR / "index.html"
+DB_FILE = Path(os.getenv("OPTIPULSE_DB", str(BASE_DIR / "optipulse.db")))
+
+
+def db_connect() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_FILE, timeout=5)
+    conn.execute("PRAGMA journal_mode=WAL")
+    return conn
+
+
+def init_db() -> None:
+    conn = db_connect()
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS app_state (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                clients TEXT,
+                alerts TEXT,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+
+
 @asynccontextmanager
 async def lifespan(_app):
     # Banner dicetak saat server benar-benar siap menerima koneksi.
     port = os.getenv("PORT", "5000")
     lan_ip = get_lan_ip()
+    init_db()
     print("=" * 64)
     print("  OptiPulse NOC siap dijalankan")
     print(f"  Di laptop ini      : http://localhost:{port}")
     print(f"  Dari HP / laptop   : http://{lan_ip}:{port}")
+    print(f"  Penyimpanan data   : {DB_FILE}")
     print("  Pastikan izin firewall Windows aktif untuk jaringan Private.")
     print("  Hentikan server    : Ctrl + C")
     print("=" * 64, flush=True)
     yield
 
 
-app = FastAPI(title="OptiPulse NOC", version="1.2.0", lifespan=lifespan)
-
-BASE_DIR = Path(__file__).resolve().parent
-INDEX_FILE = BASE_DIR / "index.html"
+app = FastAPI(title="OptiPulse NOC", version="1.3.0", lifespan=lifespan)
 
 # Origin yang diizinkan. Default "*" agar bisa dibuka dari GitHub Pages / HP.
 # Contoh: OPTIPULSE_ALLOWED_ORIGINS="https://alamakk002.github.io,http://localhost:8000"
@@ -53,7 +88,7 @@ ALLOWED_ORIGINS = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_methods=["GET", "OPTIONS"],
+    allow_methods=["GET", "PUT", "OPTIONS"],
     allow_headers=["*"],
     allow_credentials=False,
     # Wajib untuk Chrome Local Network Access (Private Network Access).
@@ -140,6 +175,96 @@ def favicon():
 def health():
     """Endpoint ringan untuk mengecek backend hidup tanpa menyentuh OLT."""
     return {"status": "ok", "service": "optipulse-noc-api"}
+
+
+def parse_json_or_none(raw):
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+@app.get("/api/state")
+def get_state():
+    """Ambil data klien & log yang tersimpan di server (dipakai semua perangkat)."""
+    conn = db_connect()
+    try:
+        row = conn.execute(
+            "SELECT clients, alerts, updated_at FROM app_state WHERE id = 1"
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        return {"clients": None, "alerts": None, "updatedAt": None}
+
+    return {
+        "clients": parse_json_or_none(row[0]),
+        "alerts": parse_json_or_none(row[1]),
+        "updatedAt": row[2],
+    }
+
+
+@app.put("/api/state")
+def put_state(payload: dict = Body(...)):
+    """Simpan data dari perangkat mana pun.
+
+    Field yang tidak dikirim (mis. clients saat mode LIVE) dibiarkan apa adanya.
+    """
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Payload harus berupa objek JSON")
+
+    if "clients" in payload:
+        clients = payload["clients"]
+        if (
+            not isinstance(clients, list)
+            or len(clients) > 5000
+            or any(not isinstance(item, dict) for item in clients)
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="clients harus berupa array objek (maksimal 5000)",
+            )
+        clients_json = json.dumps(clients, ensure_ascii=False)
+    else:
+        clients_json = None
+
+    if "alerts" in payload:
+        alerts = payload["alerts"]
+        if (
+            not isinstance(alerts, list)
+            or len(alerts) > 500
+            or any(not isinstance(item, dict) for item in alerts)
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="alerts harus berupa array objek (maksimal 500)",
+            )
+        alerts_json = json.dumps(alerts, ensure_ascii=False)
+    else:
+        alerts_json = None
+
+    updated_at = now_iso()
+    conn = db_connect()
+    try:
+        conn.execute(
+            """
+            INSERT INTO app_state (id, clients, alerts, updated_at)
+            VALUES (1, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                clients = COALESCE(excluded.clients, app_state.clients),
+                alerts = COALESCE(excluded.alerts, app_state.alerts),
+                updated_at = excluded.updated_at
+            """,
+            (clients_json, alerts_json, updated_at),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {"ok": True, "updatedAt": updated_at}
 
 
 @app.get("/api/clients")
