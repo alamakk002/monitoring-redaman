@@ -1064,6 +1064,23 @@
           <p class="text-[11px] text-slate-500 mt-1">Terisi otomatis; masih bisa diedit manual bila OLT Anda berbeda.</p>
         </div>
 
+        <div class="rounded-xl border border-slate-700/80 bg-slate-800/40 p-3 space-y-2.5">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <p class="text-xs font-semibold text-slate-200">Port PON yang dipantau</p>
+              <p class="text-[11px] text-slate-500 mt-0.5">Tambahkan beberapa port agar semua pelanggan tampil. Kosong = hanya perintah di atas.</p>
+            </div>
+            <button type="button" id="btn-olt-clear-targets" class="hidden shrink-0 text-[11px] text-slate-400 hover:text-rose-400 transition">Kosongkan</button>
+          </div>
+          <div id="olt-targets-list" class="flex flex-wrap gap-1.5"></div>
+          <p id="olt-targets-empty" class="text-[11px] text-slate-500 italic">Belum ada port tambahan.</p>
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" id="btn-olt-add-target" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] text-slate-200 transition disabled:opacity-40 disabled:cursor-not-allowed">+ Tambah port ini</button>
+            <button type="button" id="btn-olt-scan" class="px-2.5 py-1.5 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 text-[11px] text-teal-300 transition disabled:opacity-40 disabled:cursor-not-allowed">Cari port otomatis</button>
+            <span id="olt-scan-note" class="text-[11px] text-slate-500"></span>
+          </div>
+        </div>
+
         <div id="olt-config-status" class="hidden p-3 rounded-lg text-xs border"></div>
 
         <p class="text-[11px] text-slate-500 leading-relaxed">
@@ -1289,7 +1306,11 @@
 
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        // Monitoring banyak port butuh waktu lebih lama dari satu perintah.
+        const timeoutMs = oltTargets.length
+          ? Math.min(180000, 6000 + oltTargets.length * 2500)
+          : 4000;
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
         let response;
         try {
           response = await fetch(`${getApiBase()}/api/clients`, {
@@ -2439,11 +2460,15 @@
         recoBox.classList.add('hidden');
         document.getElementById('olt-model-note').textContent =
           'Tulis perintah manual sesuai merek OLT, lalu uji dengan Tes Koneksi.';
+        document.getElementById('btn-olt-add-target').disabled = true;
+        document.getElementById('btn-olt-scan').disabled = true;
         return;
       }
 
       positionWrap.classList.remove('hidden');
       recoBox.classList.remove('hidden');
+      document.getElementById('btn-olt-add-target').disabled = false;
+      document.getElementById('btn-olt-scan').disabled = false;
 
       const usesPort = !!preset.usesPort;
       portInput.disabled = !usesPort;
@@ -2461,6 +2486,148 @@
       }
     }
 
+    let oltTargets = [];
+
+    function oltPositionLabel() {
+      const key = document.getElementById('olt-model').value;
+      const p = readOltPosition();
+      if (key === 'huawei_gpon') return `Frame ${p.frame} / Slot ${p.slot} (semua port)`;
+      return `Frame ${p.frame} / Slot ${p.slot} / Port ${p.port}`;
+    }
+
+    function renderOltTargets() {
+      const list = document.getElementById('olt-targets-list');
+      const empty = document.getElementById('olt-targets-empty');
+      const clear = document.getElementById('btn-olt-clear-targets');
+      if (!list || !empty || !clear) return;
+
+      if (!oltTargets.length) {
+        list.innerHTML = '';
+        empty.classList.remove('hidden');
+        clear.classList.add('hidden');
+        return;
+      }
+
+      empty.classList.add('hidden');
+      clear.classList.remove('hidden');
+      list.innerHTML = oltTargets.map((target, index) => `
+        <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-900 border border-slate-700 text-[11px] text-slate-300" title="${escapeHtml(target.command)}">
+          <span>${escapeHtml(target.label || target.command)}</span>
+          <button type="button" data-target-index="${index}" class="text-slate-500 hover:text-rose-400 px-0.5" aria-label="Hapus ${escapeHtml(target.label || 'port')}">&times;</button>
+        </span>`).join('');
+    }
+
+    function addOltTarget(notify = true) {
+      const key = document.getElementById('olt-model').value;
+      if (key === 'custom') {
+        if (notify) showToast('Pilih merek OLT dulu agar port bisa ditambahkan', 'warning');
+        return false;
+      }
+
+      const command = document.getElementById('olt-command').value.trim();
+      if (!command) {
+        if (notify) showToast('Perintah baca redaman masih kosong', 'warning');
+        return false;
+      }
+      if (oltTargets.some(t => t.command === command)) {
+        if (notify) showToast('Port ini sudah ada di daftar', 'info');
+        return false;
+      }
+      if (oltTargets.length >= 32) {
+        if (notify) showToast('Maksimal 32 port yang dipantau', 'warning');
+        return false;
+      }
+
+      const label = oltPositionLabel();
+      oltTargets.push({ label, command });
+      renderOltTargets();
+      if (notify) showToast(`${label} ditambahkan`, 'success');
+      return true;
+    }
+
+    function buildScanCandidates() {
+      const key = document.getElementById('olt-model').value;
+      const p = readOltPosition();
+      const candidates = [];
+
+      if (key === 'zte_gpon') {
+        for (let port = 1; port <= 16; port++) {
+          candidates.push({
+            label: `Frame ${p.frame} / Slot ${p.slot} / Port ${port}`,
+            command: `show gpon onu detail-info gpon-olt_${p.frame}/${p.slot}/${port}`
+          });
+        }
+      } else if (key === 'huawei_gpon') {
+        for (let slot = 1; slot <= 8; slot++) {
+          candidates.push({
+            label: `Frame ${p.frame} / Slot ${slot} (semua port)`,
+            command: `display ont optical-info ${p.frame} ${slot} all`
+          });
+        }
+      }
+      return candidates;
+    }
+
+    async function scanOltPorts() {
+      const key = document.getElementById('olt-model').value;
+      if (key === 'custom') {
+        showToast('Pencarian otomatis hanya untuk merek ZTE / Huawei', 'warning');
+        return;
+      }
+
+      const candidates = buildScanCandidates();
+      if (!candidates.length) return;
+
+      const btn = document.getElementById('btn-olt-scan');
+      const note = document.getElementById('olt-scan-note');
+      const original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Mencari...';
+      note.textContent = `Memeriksa ${candidates.length} port, mohon tunggu...`;
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 180000);
+      try {
+        const res = await fetch(`${getApiBase()}/api/olt/scan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ commands: candidates }),
+          signal: controller.signal
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+        if (!data.ok) throw new Error(data.message || 'Pencarian port gagal');
+
+        const found = (data.results || []).filter(item => item.count > 0);
+        found.forEach(item => {
+          if (oltTargets.length >= 32) return;
+          if (!oltTargets.some(t => t.command === item.command)) {
+            oltTargets.push({ label: item.label || '', command: item.command });
+          }
+        });
+        renderOltTargets();
+
+        if (found.length) {
+          note.textContent = `${found.length} port berisi ONU ditambahkan.`;
+          showToast(`${found.length} port PON ditemukan`, 'success');
+        } else {
+          note.textContent = 'Tidak ada port berisi ONU pada rentang yang dicoba.';
+          showToast('Tidak ada ONU terdeteksi di port yang dicoba', 'warning');
+        }
+        if (data.partial) note.textContent += ' (dihentikan karena batas waktu)';
+      } catch (err) {
+        const message = err && err.name === 'AbortError'
+          ? 'Pencarian melebihi batas waktu.'
+          : (err.message || 'Pencarian gagal');
+        note.textContent = message;
+        showToast(`Gagal mencari port: ${message}`, 'error');
+      } finally {
+        clearTimeout(timer);
+        btn.disabled = false;
+        btn.textContent = original;
+      }
+    }
+
     function fillOltConfigForm() {
       const cfg = oltConfig || {};
       document.getElementById('olt-host').value = cfg.host || '';
@@ -2468,6 +2635,12 @@
       document.getElementById('olt-username').value = cfg.username || '';
       document.getElementById('olt-device-type').value = cfg.device_type || 'zte_zxros';
       document.getElementById('olt-timeout').value = cfg.timeout || 10;
+
+      oltTargets = Array.isArray(cfg.targets)
+        ? cfg.targets
+            .filter(t => t && typeof t.command === 'string' && t.command.trim())
+            .map(t => ({ label: String(t.label || ''), command: t.command.trim() }))
+        : [];
 
       const command = (cfg.command || '').trim();
       let detected = detectOltPreset(cfg);
@@ -2490,6 +2663,7 @@
         document.getElementById('olt-command').value = command;
       }
       updateOltPresetUI({ regenerate: !command });
+      renderOltTargets();
 
       const pw = document.getElementById('olt-password');
       pw.value = '';
@@ -2504,7 +2678,8 @@
         password: document.getElementById('olt-password').value,
         device_type: document.getElementById('olt-device-type').value.trim() || 'zte_zxros',
         command: document.getElementById('olt-command').value.trim(),
-        timeout: Number(document.getElementById('olt-timeout').value) || 10
+        timeout: Number(document.getElementById('olt-timeout').value) || 10,
+        targets: oltTargets.map(t => ({ label: t.label, command: t.command }))
       };
     }
 
@@ -3127,6 +3302,26 @@
       document.getElementById('btn-olt-use-reco').addEventListener('click', () => {
         updateOltPresetUI({ regenerate: true });
         showToast('Perintah rekomendasi dipakai', 'info');
+      });
+
+      // Daftar port PON yang dipantau
+      document.getElementById('btn-olt-add-target').addEventListener('click', () => addOltTarget(true));
+      document.getElementById('btn-olt-scan').addEventListener('click', scanOltPorts);
+      document.getElementById('btn-olt-clear-targets').addEventListener('click', () => {
+        if (!oltTargets.length) return;
+        if (!window.confirm('Kosongkan daftar port yang dipantau?')) return;
+        oltTargets = [];
+        renderOltTargets();
+        showToast('Daftar port dikosongkan', 'info');
+      });
+      document.getElementById('olt-targets-list').addEventListener('click', (event) => {
+        const removeBtn = event.target.closest('button[data-target-index]');
+        if (!removeBtn) return;
+        const index = Number(removeBtn.getAttribute('data-target-index'));
+        if (!Number.isInteger(index) || index < 0 || index >= oltTargets.length) return;
+        const removed = oltTargets.splice(index, 1)[0];
+        renderOltTargets();
+        showToast(`${removed.label || 'Port'} dihapus dari daftar`, 'info');
       });
 
       // Initial renders

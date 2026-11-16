@@ -170,7 +170,7 @@ async def lifespan(_app):
     yield
 
 
-app = FastAPI(title="OptiPulse NOC", version="1.5.1", lifespan=lifespan)
+app = FastAPI(title="OptiPulse NOC", version="1.6.0", lifespan=lifespan)
 
 # Aset offline (Tailwind & Chart.js) disajikan dari folder yang sama.
 app.mount(
@@ -299,6 +299,39 @@ def current_olt_config() -> dict:
     return cfg
 
 
+def normalize_olt_targets(raw) -> list:
+    """Validasi daftar port PON yang dipantau.
+
+    Tiap entri: {"label": "Frame 1 / Slot 1 / Port 2", "command": "show ..."}.
+    Maksimal 32 port agar refresh tetap wajar.
+    """
+    if not isinstance(raw, list):
+        return []
+
+    targets = []
+    seen = set()
+    for item in raw[:32]:
+        if isinstance(item, str):
+            command = item.strip()
+            label = ""
+        elif isinstance(item, dict):
+            command = str(item.get("command") or "").strip()
+            label = str(item.get("label") or "").strip()
+        else:
+            continue
+
+        if not command or "\n" in command or "\r" in command or command in seen:
+            continue
+        seen.add(command)
+        targets.append({"label": label[:60], "command": command[:300]})
+    return targets
+
+
+def saved_olt_targets() -> list:
+    saved = saved_olt_config() or {}
+    return normalize_olt_targets(saved.get("targets"))
+
+
 def public_olt_config() -> dict:
     """Konfigurasi aman untuk dikirim ke browser (tanpa password)."""
     cfg = current_olt_config()
@@ -316,6 +349,7 @@ def public_olt_config() -> dict:
         "device_type": cfg["device_type"],
         "command": cfg["command"],
         "timeout": cfg["timeout"],
+        "targets": normalize_olt_targets((saved or {}).get("targets")),
         "passwordSet": bool(cfg["password"]),
         "configured": bool(cfg["host"] and cfg["username"]),
         "source": source,
@@ -416,6 +450,7 @@ def normalize_olt_payload(payload: dict) -> dict:
 
     device_type = str(payload.get("device_type") or "zte_zxros").strip() or "zte_zxros"
     command = str(payload.get("command") or OLT_DEFAULT_COMMAND).strip() or OLT_DEFAULT_COMMAND
+    targets = normalize_olt_targets(payload.get("targets"))
 
     return {
         "host": host,
@@ -425,6 +460,7 @@ def normalize_olt_payload(payload: dict) -> dict:
         "device_type": device_type,
         "command": command,
         "timeout": timeout,
+        "targets": targets,
     }
 
 
@@ -452,6 +488,8 @@ def put_olt_config(payload: dict = Body(...)):
         "command": cfg["command"],
         "timeout": cfg["timeout"],
     }
+    if cfg["targets"]:
+        stored["targets"] = cfg["targets"]
     if password:
         stored["password"] = password
 
@@ -693,22 +731,108 @@ def get_olt_clients():
     connection = None
     try:
         connection = ConnectHandler(**build_olt_device(cfg))
-        output = connection.send_command(cfg["command"], read_timeout=cfg["timeout"] + 5)
-        clients = parse_olt_clients(output)
-        if not clients:
+        targets = saved_olt_targets()
+        commands = targets or [{"label": "", "command": cfg["command"]}]
+
+        merged = []
+        first_empty_output = ""
+        for target in commands:
+            output = connection.send_command(
+                target["command"], read_timeout=cfg["timeout"] + 5
+            )
+            parsed = parse_olt_clients(output)
+            if not parsed and not first_empty_output:
+                first_empty_output = (output or "")[:800]
+
+            label = target.get("label") or ""
+            for client in parsed:
+                client["id"] = f"CLI-OLT-{len(merged) + 1:04d}"
+                client["port"] = len(merged) + 1
+                if label:
+                    client["name"] = f"{label} · {client['name']}"
+                merged.append(client)
+
+        if not merged:
             return {
                 "error": (
                     "OLT terhubung, tetapi tidak ada nilai Rx yang terbaca. "
-                    "Sesuaikan OLT_COMMAND / device type dengan merek OLT Anda."
+                    "Sesuaikan perintah / device type dengan merek OLT Anda."
                 ),
                 "status": "OLT_PARSE_EMPTY",
-                "outputSample": (output or "")[:800],
+                "outputSample": first_empty_output,
             }
-        return clients
+        return merged
     except Exception as error:  # noqa: BLE001 - status dikirim ke UI
         return {
             "error": friendly_olt_error(error, cfg["timeout"]),
             "status": "OLT_UNREACHABLE",
+        }
+    finally:
+        if connection is not None:
+            try:
+                connection.disconnect()
+            except Exception:
+                pass
+
+
+@app.post("/api/olt/scan")
+def scan_olt_ports(payload: dict = Body(default={})):
+    """Cari port PON yang berisi ONU dengan mencoba beberapa perintah.
+
+    Dipakai tombol "Cari port otomatis": frontend mengirim daftar kandidat
+    perintah, backend menjalankannya dalam satu sesi Telnet/SSH.
+    """
+    import time
+
+    raw = payload.get("commands") if isinstance(payload, dict) else None
+    candidates = normalize_olt_targets(raw)
+    if not candidates:
+        raise HTTPException(status_code=400, detail="Daftar perintah port kosong")
+
+    cfg = current_olt_config()
+    if not cfg["host"] or not cfg["username"]:
+        return {
+            "ok": False,
+            "message": "OLT belum dikonfigurasi. Lengkapi Pengaturan OLT lebih dulu.",
+        }
+    if not cfg["password"]:
+        return {"ok": False, "message": "Password OLT belum diisi."}
+
+    started = time.monotonic()
+    connection = None
+    results = []
+    partial = False
+    try:
+        connection = ConnectHandler(**build_olt_device(cfg))
+        for index, target in enumerate(candidates):
+            # Batasi total waktu agar browser tidak menunggu terlalu lama.
+            if index > 0 and time.monotonic() - started > 90:
+                partial = True
+                break
+            output = connection.send_command(
+                target["command"], read_timeout=cfg["timeout"] + 5
+            )
+            clients = parse_olt_clients(output)
+            results.append(
+                {
+                    "command": target["command"],
+                    "label": target["label"],
+                    "count": len(clients),
+                    "rxSample": [c["rxPower"] for c in clients[:5]],
+                }
+            )
+        return {
+            "ok": True,
+            "results": results,
+            "partial": partial,
+            "durationMs": int((time.monotonic() - started) * 1000),
+        }
+    except Exception as error:  # noqa: BLE001 - status dikirim ke UI
+        return {
+            "ok": False,
+            "message": friendly_olt_error(error, cfg["timeout"]),
+            "results": results,
+            "durationMs": int((time.monotonic() - started) * 1000),
         }
     finally:
         if connection is not None:

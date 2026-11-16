@@ -195,6 +195,16 @@ Pilih **Merek / model OLT**, lalu isi **Frame / Slot / Port PON**. Perintah reko
 
 Untuk Huawei, kolom Port PON tidak dipakai karena perintah `all` membaca semua port pada slot tersebut. Tombol **Pakai** mengembalikan kolom perintah ke rekomendasi bila sudah diubah manual.
 
+#### Memantau banyak port PON sekaligus
+
+Di bagian **Port PON yang dipantau**:
+
+- **+ Tambah port ini** — memasukkan port yang sedang dipilih ke daftar. Ulangi untuk port lain (maksimal 32).
+- **Cari port otomatis** — aplikasi memeriksa port 1–16 pada slot terpilih (ZTE) atau slot 1–8 (Huawei), lalu menambahkan port yang berisi ONU. Proses ini bisa memakan 20–60 detik karena setiap port dijalankan satu per satu.
+- Tombol **×** pada chip menghapus port dari daftar; **Kosongkan** menghapus semuanya.
+
+Saat daftar berisi port, mode **Jaringan yang Terhubung** membaca semua port itu dan menggabungkan hasilnya, sehingga pelanggan di port berbeda tampil di satu dashboard. Nama ONU diberi awalan lokasi port, mis. `Frame 1 / Slot 1 / Port 3 · ONU Port 2`.
+
 Klik **Tes Koneksi** untuk memastikan IP/port/kredensial benar sebelum menyimpan, lalu **Simpan**.
 Setelah tersimpan, tombol **Cek Koneksi** dan mode **Jaringan yang Terhubung** langsung memakai pengaturan tersebut.
 

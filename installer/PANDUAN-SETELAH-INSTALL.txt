@@ -13,6 +13,8 @@ OptiPulse NOC sudah terpasang.
    - Isi Host/IP OLT, Port (23 Telnet / 22 SSH), Username, dan Password.
    - Pilih "Merek / model OLT" (ZTE, Huawei, atau Lainnya), lalu isi
      Frame / Slot / Port PON. Perintah baca redaman terisi otomatis.
+   - Bila pelanggan tersebar di beberapa port, klik "Cari port otomatis"
+     atau "+ Tambah port ini" agar semuanya terbaca di dashboard.
    - Klik "Tes Koneksi", lalu "Simpan".
 
    Pengaturan disimpan di PC server dan dipakai semua perangkat yang
