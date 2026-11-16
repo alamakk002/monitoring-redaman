@@ -168,9 +168,25 @@ Setelah terpasang, aplikasi ada di **Start Menu → OptiPulse NOC**. Tidak perlu
 
 **Jangan tutup jendela hitam** selama aplikasi dipakai — jendela itu adalah servernya. Tutup jendela untuk menghentikan aplikasi.
 
-### 3. Konfigurasi OLT
+### 3. Konfigurasi OLT (dari dashboard)
 
-Buat file `optipulse.env` di folder aplikasi (contoh: `optipulse.env.example` yang ikut terpasang):
+Cara termudah: buka aplikasi → tab **Dashboard & Monitoring** → tombol **Pengaturan OLT**.
+
+Isi:
+
+| Kolom | Contoh | Keterangan |
+|---|---|---|
+| Host / IP OLT | `192.168.1.100` | IP perangkat OLT di jaringan manajemen |
+| Port | `23` | 23 = Telnet, 22 = SSH |
+| Username | `admin` | Akun OLT (disarankan akun read-only) |
+| Password | `••••` | Disimpan di PC server, tidak dikirim ke browser lain |
+| Tipe perangkat | `zte_zxros` | Driver netmiko sesuai merek OLT |
+| Perintah baca redaman | `show gpon onu detail-info gpon-olt_1/1/1` | Sesuaikan dengan OLT Anda |
+
+Klik **Tes Koneksi** untuk memastikan IP/port/kredensial benar sebelum menyimpan, lalu **Simpan**.
+Setelah tersimpan, tombol **Cek Koneksi** dan mode **Jaringan yang Terhubung** langsung memakai pengaturan tersebut.
+
+Alternatif tanpa membuka aplikasi: buat file `optipulse.env` di folder aplikasi (contoh: `optipulse.env.example` yang ikut terpasang).
 
 ```ini
 OLT_HOST=192.168.1.100
@@ -182,14 +198,17 @@ OLT_PORT=23
 - Installer: `%LOCALAPPDATA%\Programs\OptiPulse NOC\optipulse.env`
 - Portable: di samping `OptiPulse-NOC.exe`
 
-Tanpa file ini, aplikasi tetap berjalan dalam mode demo. Environment variable Windows juga tetap didahulukan.
+**Urutan prioritas:** pengaturan yang disimpan dari dashboard → isi `optipulse.env` → environment variable Windows. Tombol **Hapus pengaturan tersimpan** mengembalikan aplikasi ke nilai `optipulse.env`.
+
+Tanpa konfigurasi sama sekali, aplikasi tetap berjalan dalam mode demo.
 
 ### 4. Lokasi data
 
 | Item | Lokasi |
 |---|---|
 | Database bersama | `%LOCALAPPDATA%\OptiPulse NOC\optipulse.db` |
-| Konfigurasi (opsional) | `optipulse.env` di folder aplikasi atau folder data di atas |
+| Pengaturan OLT dari dashboard | tabel `settings` di `optipulse.db` yang sama |
+| Konfigurasi alternatif (opsional) | `optipulse.env` di folder aplikasi atau folder data di atas |
 
 Menghapus data = hapus folder `%LOCALAPPDATA%\OptiPulse NOC`.
 
@@ -274,6 +293,8 @@ Lalu buka `http://localhost:5050`. Untuk `.exe`, ubah `PORT=5050` di `optipulse.
 **Data .exe tidak muncul di perangkat lain** — setiap `.exe` punya database sendiri. Jalankan `.exe` di satu PC saja, perangkat lain mengakses `http://IP-PC:5000`.
 
 **HP tidak bisa membuka halaman** — pastikan satu jaringan, firewall mengizinkan port 5000, dan IP yang dipakai benar.
+
+**"OLT belum dikonfigurasi"** — buka **Pengaturan OLT** di dashboard, isi host/username/password, klik **Tes Koneksi**, lalu **Simpan**. Tidak perlu mengedit file apa pun.
 
 **"Backend online, namun OLT belum terjangkau"** — server hidup, tetapi koneksi ke OLT gagal. Periksa `OLT_HOST`, kabel/VLAN manajemen, dan kredensial OLT.
 

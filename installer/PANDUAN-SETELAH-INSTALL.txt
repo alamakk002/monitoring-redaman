@@ -7,13 +7,18 @@ OptiPulse NOC sudah terpasang.
    Jendela hitam yang muncul adalah servernya. Jangan ditutup selama
    aplikasi dipakai. Tutup jendela tersebut untuk menghentikan aplikasi.
 
-2. Mengatur koneksi OLT:
-   - Buka folder instalasi (biasanya):
-     %LOCALAPPDATA%\Programs\OptiPulse NOC
-   - Salin file "optipulse.env.example" menjadi "optipulse.env".
-   - Buka dengan Notepad dan isi OLT_HOST, OLT_USERNAME, OLT_PASSWORD,
-     dan OLT_PORT sesuai OLT Anda.
-   - Tutup lalu jalankan ulang OptiPulse NOC.
+2. Mengatur koneksi OLT (tanpa edit file):
+   - Di aplikasi, buka tab "Dashboard & Monitoring".
+   - Klik tombol "Pengaturan OLT" di kanan atas.
+   - Isi Host/IP OLT, Port (23 Telnet / 22 SSH), Username, Password,
+     dan tipe perangkat (mis. zte_zxros).
+   - Klik "Tes Koneksi", lalu "Simpan".
+
+   Pengaturan disimpan di PC server dan dipakai semua perangkat yang
+   membuka aplikasi ini.
+
+   Alternatif: file optipulse.env (lihat optipulse.env.example) masih
+   didukung bila ingin mengatur lewat teks.
 
 3. Jika Windows Firewall bertanya saat pertama dijalankan:
    centang "Private networks" lalu klik "Allow access".

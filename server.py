@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import socket
 import sqlite3
 import sys
@@ -131,6 +132,14 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+            """
+        )
         conn.commit()
     finally:
         conn.close()
@@ -161,7 +170,7 @@ async def lifespan(_app):
     yield
 
 
-app = FastAPI(title="OptiPulse NOC", version="1.4.1", lifespan=lifespan)
+app = FastAPI(title="OptiPulse NOC", version="1.5.0", lifespan=lifespan)
 
 # Aset offline (Tailwind & Chart.js) disajikan dari folder yang sama.
 app.mount(
@@ -181,7 +190,7 @@ ALLOWED_ORIGINS = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_methods=["GET", "PUT", "OPTIONS"],
+    allow_methods=["GET", "PUT", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
     allow_credentials=False,
     # Wajib untuk Chrome Local Network Access (Private Network Access).
@@ -211,19 +220,120 @@ def env(name: str, default: str) -> str:
     return os.getenv(name, default)
 
 
-# Konfigurasi akses OLT. Semua nilai dapat diatur lewat environment variable
-# sehingga password tidak perlu ditulis di dalam kode.
-OLT_DEVICE = {
-    "device_type": env("OLT_DEVICE_TYPE", "zte_zxros"),  # zte_zxros, huawei, cisco_ios, generic
-    "host": env("OLT_HOST", "192.168.1.100"),
-    "username": env("OLT_USERNAME", "admin"),
-    "password": env("OLT_PASSWORD", "password_olt"),
-    "port": int(env("OLT_PORT", "23")),                  # 23 (Telnet) atau 22 (SSH)
-    "timeout": int(env("OLT_TIMEOUT", "10")),
-    "fast_cli": False,
-}
+# Konfigurasi akses OLT.
+# Urutan prioritas: pengaturan yang disimpan dari dashboard > optipulse.env /
+# environment variable Windows. Dengan begitu teknisi bisa mengisi kredensial
+# lewat browser tanpa mengedit file.
+OLT_SETTING_KEY = "olt_config"
+OLT_DEFAULT_COMMAND = "show gpon onu detail-info gpon-olt_1/1/1"
 
-OLT_COMMAND = env("OLT_COMMAND", "show gpon onu detail-info gpon-olt_1/1/1")
+
+def olt_env_config() -> dict:
+    """Nilai awal dari optipulse.env / environment variable."""
+    return {
+        "host": env("OLT_HOST", "").strip(),
+        "port": int(env("OLT_PORT", "23") or 23),
+        "username": env("OLT_USERNAME", "").strip(),
+        "password": env("OLT_PASSWORD", ""),
+        "device_type": env("OLT_DEVICE_TYPE", "zte_zxros").strip() or "zte_zxros",
+        "command": env("OLT_COMMAND", OLT_DEFAULT_COMMAND).strip() or OLT_DEFAULT_COMMAND,
+        "timeout": int(env("OLT_TIMEOUT", "10") or 10),
+    }
+
+
+def get_setting(key: str):
+    conn = db_connect()
+    try:
+        row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    finally:
+        conn.close()
+    return row[0] if row else None
+
+
+def set_setting(key: str, value) -> None:
+    conn = db_connect()
+    try:
+        if value is None:
+            conn.execute("DELETE FROM settings WHERE key = ?", (key,))
+        else:
+            conn.execute(
+                """
+                INSERT INTO settings (key, value) VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                (key, value),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def saved_olt_config():
+    """Konfigurasi OLT yang terakhir disimpan dari dashboard (bila ada)."""
+    data = parse_json_or_none(get_setting(OLT_SETTING_KEY))
+    return data if isinstance(data, dict) else None
+
+
+def current_olt_config() -> dict:
+    """Gabungan nilai tersimpan dan nilai dari file .env."""
+    cfg = olt_env_config()
+    saved = saved_olt_config()
+    if not saved:
+        return cfg
+
+    for key in ("host", "username", "device_type", "command"):
+        value = saved.get(key)
+        if isinstance(value, str) and value.strip():
+            cfg[key] = value.strip()
+
+    if isinstance(saved.get("password"), str) and saved["password"]:
+        cfg["password"] = saved["password"]
+
+    for key in ("port", "timeout"):
+        try:
+            if saved.get(key):
+                cfg[key] = int(saved[key])
+        except (TypeError, ValueError):
+            pass
+
+    return cfg
+
+
+def public_olt_config() -> dict:
+    """Konfigurasi aman untuk dikirim ke browser (tanpa password)."""
+    cfg = current_olt_config()
+    saved = saved_olt_config()
+    if saved:
+        source = "dashboard"
+    elif cfg["host"]:
+        source = "optipulse.env"
+    else:
+        source = "belum diatur"
+    return {
+        "host": cfg["host"],
+        "port": cfg["port"],
+        "username": cfg["username"],
+        "device_type": cfg["device_type"],
+        "command": cfg["command"],
+        "timeout": cfg["timeout"],
+        "passwordSet": bool(cfg["password"]),
+        "configured": bool(cfg["host"] and cfg["username"]),
+        "source": source,
+        "defaultCommand": OLT_DEFAULT_COMMAND,
+    }
+
+
+def build_olt_device(cfg: dict) -> dict:
+    return {
+        "device_type": cfg["device_type"],
+        "host": cfg["host"],
+        "username": cfg["username"],
+        "password": cfg["password"],
+        "port": int(cfg["port"]),
+        "timeout": int(cfg["timeout"]),
+        "conn_timeout": int(cfg["timeout"]),
+        "fast_cli": False,
+    }
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -268,6 +378,173 @@ def favicon():
 def health():
     """Endpoint ringan untuk mengecek backend hidup tanpa menyentuh OLT."""
     return {"status": "ok", "service": "optipulse-noc-api"}
+
+
+# ---------------------------------------------------------------------------
+# Pengaturan OLT dari dashboard (tanpa mengedit optipulse.env)
+# ---------------------------------------------------------------------------
+
+
+def normalize_olt_payload(payload: dict) -> dict:
+    """Validasi isian form Pengaturan OLT."""
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Payload harus berupa objek JSON")
+
+    host = str(payload.get("host") or "").strip()
+    username = str(payload.get("username") or "").strip()
+    if not host:
+        raise HTTPException(status_code=400, detail="Host / IP OLT wajib diisi")
+    if not username:
+        raise HTTPException(status_code=400, detail="Username OLT wajib diisi")
+
+    try:
+        port = int(payload.get("port") or 23)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Port harus berupa angka")
+    if not 1 <= port <= 65535:
+        raise HTTPException(status_code=400, detail="Port harus di antara 1 dan 65535")
+
+    try:
+        timeout = int(payload.get("timeout") or 10)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Timeout harus berupa angka")
+    if not 1 <= timeout <= 60:
+        raise HTTPException(status_code=400, detail="Timeout harus di antara 1 dan 60 detik")
+
+    password = payload.get("password")
+    password = password if isinstance(password, str) else ""
+
+    device_type = str(payload.get("device_type") or "zte_zxros").strip() or "zte_zxros"
+    command = str(payload.get("command") or OLT_DEFAULT_COMMAND).strip() or OLT_DEFAULT_COMMAND
+
+    return {
+        "host": host,
+        "port": port,
+        "username": username,
+        "password": password,
+        "device_type": device_type,
+        "command": command,
+        "timeout": timeout,
+    }
+
+
+@app.get("/api/olt/config")
+def get_olt_config():
+    """Konfigurasi OLT aktif. Password tidak pernah dikirim ke browser."""
+    return public_olt_config()
+
+
+@app.put("/api/olt/config")
+def put_olt_config(payload: dict = Body(...)):
+    """Simpan konfigurasi OLT dari dashboard.
+
+    Password kosong berarti mempertahankan password yang sudah tersimpan.
+    """
+    cfg = normalize_olt_payload(payload)
+    previous = saved_olt_config() or {}
+    password = cfg["password"] or previous.get("password") or current_olt_config()["password"]
+
+    stored = {
+        "host": cfg["host"],
+        "port": cfg["port"],
+        "username": cfg["username"],
+        "device_type": cfg["device_type"],
+        "command": cfg["command"],
+        "timeout": cfg["timeout"],
+    }
+    if password:
+        stored["password"] = password
+
+    set_setting(OLT_SETTING_KEY, json.dumps(stored, ensure_ascii=False))
+    return {"ok": True, "config": public_olt_config()}
+
+
+@app.delete("/api/olt/config")
+def delete_olt_config():
+    """Hapus konfigurasi dari dashboard dan kembali ke optipulse.env."""
+    set_setting(OLT_SETTING_KEY, None)
+    return {"ok": True, "config": public_olt_config()}
+
+
+def friendly_olt_error(error: Exception, timeout: int) -> str:
+    """Ubah error netmiko menjadi pesan yang bisa ditindaklanjuti teknisi."""
+    name = type(error).__name__
+    detail = str(error).strip() or name
+    if "Authentication" in name:
+        return "Username atau password ditolak oleh OLT."
+    if "Timeout" in name:
+        return (
+            f"OLT tidak merespons dalam {timeout} detik. "
+            "Periksa IP, port (23 Telnet / 22 SSH), dan jaringan manajemen."
+        )
+    if "TCP connection" in detail:
+        return (
+            "Koneksi TCP ke OLT gagal. Periksa IP, port, dan firewall. "
+            "Pastikan PC server berada di jaringan manajemen OLT."
+        )
+    return f"Gagal terhubung ke OLT: {detail[:220]}"
+
+
+@app.post("/api/olt/config/test")
+def test_olt_config(payload: dict = Body(default={})):
+    """Coba hubungkan ke OLT memakai isian form (bisa sebelum disimpan)."""
+    import time
+
+    cfg = current_olt_config()
+    if isinstance(payload, dict):
+        for key in ("host", "username", "device_type", "command"):
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                cfg[key] = value.strip()
+        password = payload.get("password")
+        if isinstance(password, str) and password:
+            cfg["password"] = password
+        for key in ("port", "timeout"):
+            try:
+                if payload.get(key):
+                    cfg[key] = int(payload[key])
+            except (TypeError, ValueError):
+                pass
+
+    if not cfg["host"]:
+        return {"ok": False, "message": "Host / IP OLT belum diisi."}
+    if not cfg["username"]:
+        return {"ok": False, "message": "Username OLT belum diisi."}
+    if not cfg["password"]:
+        return {"ok": False, "message": "Password OLT belum diisi."}
+
+    started = time.monotonic()
+    connection = None
+    try:
+        connection = ConnectHandler(**build_olt_device(cfg))
+        prompt = connection.find_prompt()
+        snippet = ""
+        if payload.get("runCommand"):
+            snippet = connection.send_command(cfg["command"], read_timeout=cfg["timeout"] + 5)
+            snippet = snippet[:1200]
+        duration = int((time.monotonic() - started) * 1000)
+        return {
+            "ok": True,
+            "message": "OLT merespons dan kredensial diterima.",
+            "prompt": prompt,
+            "durationMs": duration,
+            "output": snippet,
+            "config": public_olt_config(),
+        }
+    except Exception as error:  # noqa: BLE001 - tampilkan pesan ramah ke pengguna
+        duration = int((time.monotonic() - started) * 1000)
+        return {
+            "ok": False,
+            "message": friendly_olt_error(error, cfg["timeout"]),
+            "error": (str(error).strip() or type(error).__name__)[:400],
+            "durationMs": duration,
+        }
+    finally:
+        if connection is not None:
+            try:
+                connection.disconnect()
+            except Exception:
+                pass
 
 
 def parse_json_or_none(raw):
@@ -360,38 +637,85 @@ def put_state(payload: dict = Body(...)):
     return {"ok": True, "updatedAt": updated_at}
 
 
+RX_LINE_RE = re.compile(
+    r"rx\s*(?:power)?[^-\d]{0,24}(?P<rx>-?\d{1,2}(?:\.\d{1,2})?)", re.IGNORECASE
+)
+
+
+def parse_olt_clients(output: str) -> list:
+    """Ambil baris yang memuat nilai Rx dari keluaran OLT.
+
+    Parser ini sengaja dibuat umum. Sesuaikan regex/OLT_COMMAND bila format
+    OLT Anda berbeda (mis. Huawei, FiberHome, atau ZTE dengan nama kolom lain).
+    """
+    clients = []
+    for line in (output or "").splitlines():
+        match = RX_LINE_RE.search(line)
+        if not match:
+            continue
+        try:
+            rx = float(match.group("rx"))
+        except (TypeError, ValueError):
+            continue
+        if not -60.0 < rx < 10.0:
+            continue
+        index = len(clients) + 1
+        clients.append(
+            {
+                "id": f"CLI-OLT-{index:04d}",
+                "name": f"ONU Port {index}",
+                "package": "-",
+                "odp": "-",
+                "port": index,
+                "ip": "-",
+                "sn": "-",
+                "rxPower": rx,
+                "latency": 0,
+            }
+        )
+    return clients
+
+
 @app.get("/api/clients")
 def get_olt_clients():
+    cfg = current_olt_config()
+    if not cfg["host"] or not cfg["username"]:
+        return {
+            "error": "OLT belum dikonfigurasi. Buka menu Pengaturan OLT di dashboard.",
+            "status": "OLT_NOT_CONFIGURED",
+        }
+    if not cfg["password"]:
+        return {
+            "error": "Password OLT belum diisi. Lengkapi lewat menu Pengaturan OLT.",
+            "status": "OLT_NOT_CONFIGURED",
+        }
+
+    connection = None
     try:
-        # 1. Menghubungkan ke OLT
-        connection = ConnectHandler(**OLT_DEVICE)
-
-        # 2. Menjalankan perintah pembacaan sinyal optik OLT
-        output = connection.send_command(OLT_COMMAND)
-        connection.disconnect()
-
-        # 3. Parsing output teks OLT menjadi format terstruktur.
-        #    Ganti contoh data di bawah dengan regex sesuai keluaran OLT Anda.
-        #    Contoh: rx = re.search(r"Rx\s*:\s*(-?\d+\.\d+)", output)
-        client_data = [
-            {
-                "id": "CLI-2001",
-                "name": "Pelanggan Port 1",
-                "package": "Home 50 Mbps",
-                "odp": "ODP-KBR-01",
-                "port": 1,
-                "ip": "192.168.10.51",
-                "sn": "ZTEG12345678",
-                "rxPower": -19.45,  # Nilai redaman aktual hasil parsing regex
-                "status": "OPTIMAL",
-                "latency": 4,
+        connection = ConnectHandler(**build_olt_device(cfg))
+        output = connection.send_command(cfg["command"], read_timeout=cfg["timeout"] + 5)
+        clients = parse_olt_clients(output)
+        if not clients:
+            return {
+                "error": (
+                    "OLT terhubung, tetapi tidak ada nilai Rx yang terbaca. "
+                    "Sesuaikan OLT_COMMAND / device type dengan merek OLT Anda."
+                ),
+                "status": "OLT_PARSE_EMPTY",
+                "outputSample": (output or "")[:800],
             }
-        ]
-        return client_data
-
-    except Exception as error:
-        # Jika OLT tidak terjangkau (misal laptop masih memakai hotspot HP)
-        return {"error": str(error), "status": "OLT_UNREACHABLE"}
+        return clients
+    except Exception as error:  # noqa: BLE001 - status dikirim ke UI
+        return {
+            "error": friendly_olt_error(error, cfg["timeout"]),
+            "status": "OLT_UNREACHABLE",
+        }
+    finally:
+        if connection is not None:
+            try:
+                connection.disconnect()
+            except Exception:
+                pass
 
 
 def is_our_server_running(port: str) -> bool:

@@ -3,7 +3,7 @@
 ; Hasil: dist\OptiPulse-NOC-Setup.exe
 
 #define MyAppName "OptiPulse NOC"
-#define MyAppVersion "1.4.1"
+#define MyAppVersion "1.5.0"
 #define MyAppPublisher "OptiPulse"
 #define MyAppExeName "OptiPulse-NOC.exe"
 
