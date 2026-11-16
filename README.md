@@ -180,8 +180,20 @@ Isi:
 | Port | `23` | 23 = Telnet, 22 = SSH |
 | Username | `admin` | Akun OLT (disarankan akun read-only) |
 | Password | `••••` | Disimpan di PC server, tidak dikirim ke browser lain |
-| Tipe perangkat | `zte_zxros` | Driver netmiko sesuai merek OLT |
-| Perintah baca redaman | `show gpon onu detail-info gpon-olt_1/1/1` | Sesuaikan dengan OLT Anda |
+| Merek / model OLT | `ZTE C320 / C300 / C600` | Pilihan cepat: ZTE, Huawei, atau manual |
+| Posisi port PON | Frame `1`, Slot `1`, Port `1` | Perintah dibentuk otomatis dari posisi ini |
+| Tipe perangkat | `zte_zxros` | Driver netmiko, terisi otomatis dari pilihan merek |
+| Perintah baca redaman | `show gpon onu detail-info gpon-olt_1/1/1` | Rekomendasi otomatis; bisa diedit manual |
+
+Pilih **Merek / model OLT**, lalu isi **Frame / Slot / Port PON**. Perintah rekomendasi langsung muncul di kotak hijau dan otomatis mengisi kolom perintah:
+
+| Merek / model | Perintah rekomendasi |
+|---|---|
+| ZTE C320 / C300 / C600 (GPON) | `show gpon onu detail-info gpon-olt_<frame>/<slot>/<port>` |
+| Huawei MA5600T / MA5800 (GPON) | `display ont optical-info <frame> <slot> all` |
+| Lainnya | tulis manual, lalu uji dengan **Tes Koneksi** |
+
+Untuk Huawei, kolom Port PON tidak dipakai karena perintah `all` membaca semua port pada slot tersebut. Tombol **Pakai** mengembalikan kolom perintah ke rekomendasi bila sudah diubah manual.
 
 Klik **Tes Koneksi** untuk memastikan IP/port/kredensial benar sebelum menyimpan, lalu **Simpan**.
 Setelah tersimpan, tombol **Cek Koneksi** dan mode **Jaringan yang Terhubung** langsung memakai pengaturan tersebut.

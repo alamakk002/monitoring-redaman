@@ -1,4 +1,4 @@
-import json
+﻿import json
 import os
 import re
 import socket
@@ -170,7 +170,7 @@ async def lifespan(_app):
     yield
 
 
-app = FastAPI(title="OptiPulse NOC", version="1.5.0", lifespan=lifespan)
+app = FastAPI(title="OptiPulse NOC", version="1.5.1", lifespan=lifespan)
 
 # Aset offline (Tailwind & Chart.js) disajikan dari folder yang sama.
 app.mount(

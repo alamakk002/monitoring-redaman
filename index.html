@@ -993,17 +993,49 @@
           </div>
         </div>
 
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label for="olt-model" class="block text-xs font-medium text-slate-300 mb-1">Merek / model OLT</label>
+            <select id="olt-model" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:border-teal-500 focus:outline-none">
+              <option value="zte_gpon">ZTE C320 / C300 / C600 (GPON)</option>
+              <option value="huawei_gpon">Huawei MA5600T / MA5800 (GPON)</option>
+              <option value="custom">Lainnya / tulis perintah sendiri</option>
+            </select>
+            <p id="olt-model-note" class="text-[11px] text-slate-500 mt-1">Pilih merek OLT, perintah rekomendasi terisi otomatis.</p>
+          </div>
+          <div id="olt-position-wrap">
+            <label class="block text-xs font-medium text-slate-300 mb-1">Posisi port PON</label>
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <input type="number" id="olt-frame" min="1" max="99" step="1" value="1" aria-label="Frame" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-2 text-sm text-slate-100 font-mono text-center focus:border-teal-500 focus:outline-none">
+                <p class="text-[10px] text-slate-500 mt-0.5 text-center">Frame</p>
+              </div>
+              <div>
+                <input type="number" id="olt-slot" min="1" max="99" step="1" value="1" aria-label="Slot" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-2 text-sm text-slate-100 font-mono text-center focus:border-teal-500 focus:outline-none">
+                <p class="text-[10px] text-slate-500 mt-0.5 text-center">Slot</p>
+              </div>
+              <div>
+                <input type="number" id="olt-pon-port" min="1" max="999" step="1" value="1" aria-label="Port PON" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-2 text-sm text-slate-100 font-mono text-center focus:border-teal-500 focus:outline-none disabled:opacity-40">
+                <p id="olt-pon-port-hint" class="text-[10px] text-slate-500 mt-0.5 text-center">Port</p>
+              </div>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-1">Contoh ZTE <span class="font-mono">gpon-olt_1/1/1</span> = Frame 1, Slot 1, Port 1.</p>
+          </div>
+        </div>
+
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
-            <label for="olt-device-type" class="block text-xs font-medium text-slate-300 mb-1">Tipe perangkat</label>
+            <label for="olt-device-type" class="block text-xs font-medium text-slate-300 mb-1">Tipe perangkat (driver)</label>
             <input type="text" id="olt-device-type" list="olt-device-types" placeholder="zte_zxros" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 font-mono focus:border-teal-500 focus:outline-none">
             <datalist id="olt-device-types">
-              <option value="zte_zxros">ZTE ZXROS (OLT ZTE)</option>
-              <option value="huawei">Huawei</option>
+              <option value="zte_zxros">ZTE ZXROS</option>
+              <option value="huawei_smartax">Huawei SmartAX</option>
+              <option value="huawei">Huawei VRP</option>
+              <option value="nokia_isam">Nokia ISAM</option>
               <option value="cisco_ios">Cisco IOS</option>
-              <option value="generic">Generic / lainnya</option>
+              <option value="generic">Generic</option>
             </datalist>
-            <p class="text-[11px] text-slate-500 mt-1">Driver netmiko, mis. zte_zxros</p>
+            <p class="text-[11px] text-slate-500 mt-1">Terisi otomatis dari pilihan merek.</p>
           </div>
           <div>
             <label for="olt-timeout" class="block text-xs font-medium text-slate-300 mb-1">Timeout (detik)</label>
@@ -1020,7 +1052,16 @@
         <div>
           <label for="olt-command" class="block text-xs font-medium text-slate-300 mb-1">Perintah baca redaman</label>
           <input type="text" id="olt-command" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 font-mono focus:border-teal-500 focus:outline-none" placeholder="show gpon onu detail-info gpon-olt_1/1/1">
-          <p class="text-[11px] text-slate-500 mt-1">Contoh ZTE: <span class="font-mono">show gpon onu detail-info gpon-olt_1/1/1</span>. Sesuaikan bila merek OLT berbeda.</p>
+          <div id="olt-reco-box" class="mt-2 rounded-lg border border-teal-500/20 bg-teal-500/5 p-2.5">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <p class="text-[11px] text-teal-300/80">Rekomendasi untuk pilihan di atas</p>
+                <code id="olt-reco-command" class="block text-xs font-mono text-teal-200 break-all"></code>
+              </div>
+              <button type="button" id="btn-olt-use-reco" class="shrink-0 px-2 py-1 rounded-md bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 text-[11px] text-teal-300 transition">Pakai</button>
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-1">Terisi otomatis; masih bisa diedit manual bila OLT Anda berbeda.</p>
         </div>
 
         <div id="olt-config-status" class="hidden p-3 rounded-lg text-xs border"></div>
@@ -2327,14 +2368,128 @@
       return oltConfigLoading;
     }
 
+    // Preset merek OLT: memilih model akan mengisi driver dan perintah
+    // rekomendasi otomatis, jadi teknisi tidak perlu hafal sintaks CLI.
+    const OLT_PRESETS = {
+      zte_gpon: {
+        deviceType: 'zte_zxros',
+        usesPort: true,
+        build: (p) => `show gpon onu detail-info gpon-olt_${p.frame}/${p.slot}/${p.port}`
+      },
+      huawei_gpon: {
+        deviceType: 'huawei_smartax',
+        usesPort: false,
+        build: (p) => `display ont optical-info ${p.frame} ${p.slot} all`
+      },
+      custom: {
+        deviceType: '',
+        usesPort: false,
+        build: () => ''
+      }
+    };
+
+    function readOltPosition() {
+      const read = (id, fallback) => {
+        const el = document.getElementById(id);
+        const value = (el && el.value ? String(el.value) : '').trim();
+        return /^\d+$/.test(value) ? value : fallback;
+      };
+      return {
+        frame: read('olt-frame', '1'),
+        slot: read('olt-slot', '1'),
+        port: read('olt-pon-port', '1')
+      };
+    }
+
+    function detectOltPreset(cfg) {
+      const deviceType = String((cfg && cfg.device_type) || '').toLowerCase();
+      const command = String((cfg && cfg.command) || '').trim();
+
+      let match = command.match(/gpon-olt_(\d+)\/(\d+)\/(\d+)/i);
+      if (match && deviceType === 'zte_zxros') {
+        return { key: 'zte_gpon', frame: match[1], slot: match[2], port: match[3] };
+      }
+
+      match = command.match(/display ont optical-info\s+(\d+)\s+(\d+)/i);
+      if (match && deviceType.indexOf('huawei') === 0) {
+        return { key: 'huawei_gpon', frame: match[1], slot: match[2] };
+      }
+
+      return { key: 'custom' };
+    }
+
+    function updateOltPresetUI({ regenerate = false } = {}) {
+      const modelSelect = document.getElementById('olt-model');
+      if (!modelSelect) return;
+
+      const key = modelSelect.value;
+      const preset = OLT_PRESETS[key] || OLT_PRESETS.custom;
+      const positionWrap = document.getElementById('olt-position-wrap');
+      const portInput = document.getElementById('olt-pon-port');
+      const portHint = document.getElementById('olt-pon-port-hint');
+      const recoBox = document.getElementById('olt-reco-box');
+      const recoText = document.getElementById('olt-reco-command');
+
+      if (preset.deviceType) {
+        document.getElementById('olt-device-type').value = preset.deviceType;
+      }
+
+      if (key === 'custom') {
+        positionWrap.classList.add('hidden');
+        recoBox.classList.add('hidden');
+        document.getElementById('olt-model-note').textContent =
+          'Tulis perintah manual sesuai merek OLT, lalu uji dengan Tes Koneksi.';
+        return;
+      }
+
+      positionWrap.classList.remove('hidden');
+      recoBox.classList.remove('hidden');
+
+      const usesPort = !!preset.usesPort;
+      portInput.disabled = !usesPort;
+      portHint.textContent = usesPort ? 'Port' : 'semua';
+      portHint.classList.toggle('text-teal-400', !usesPort);
+
+      const command = preset.build(readOltPosition());
+      recoText.textContent = command;
+      document.getElementById('olt-model-note').textContent = usesPort
+        ? 'Satu perintah membaca semua ONU di port PON tersebut.'
+        : 'Perintah "all" membaca semua port PON pada slot tersebut.';
+
+      if (regenerate) {
+        document.getElementById('olt-command').value = command;
+      }
+    }
+
     function fillOltConfigForm() {
       const cfg = oltConfig || {};
       document.getElementById('olt-host').value = cfg.host || '';
       document.getElementById('olt-port').value = cfg.port || 23;
       document.getElementById('olt-username').value = cfg.username || '';
       document.getElementById('olt-device-type').value = cfg.device_type || 'zte_zxros';
-      document.getElementById('olt-command').value = cfg.command || '';
       document.getElementById('olt-timeout').value = cfg.timeout || 10;
+
+      const command = (cfg.command || '').trim();
+      let detected = detectOltPreset(cfg);
+
+      // Belum pernah dikonfigurasi: mulai dari rekomendasi ZTE / driver yang dipilih.
+      if (!command) {
+        if ((cfg.device_type || '') === 'huawei_smartax') {
+          detected = { key: 'huawei_gpon' };
+        } else if (!cfg.device_type || cfg.device_type === 'zte_zxros') {
+          detected = { key: 'zte_gpon' };
+        }
+      }
+
+      if (detected.frame) document.getElementById('olt-frame').value = detected.frame;
+      if (detected.slot) document.getElementById('olt-slot').value = detected.slot;
+      if (detected.port) document.getElementById('olt-pon-port').value = detected.port;
+      document.getElementById('olt-model').value = detected.key;
+
+      if (command) {
+        document.getElementById('olt-command').value = command;
+      }
+      updateOltPresetUI({ regenerate: !command });
 
       const pw = document.getElementById('olt-password');
       pw.value = '';
@@ -2960,6 +3115,19 @@
       document.getElementById('form-olt-config').addEventListener('submit', saveOltConfig);
       document.getElementById('btn-olt-test').addEventListener('click', testOltConfig);
       document.getElementById('btn-olt-reset').addEventListener('click', resetOltConfig);
+
+      // Pilihan merek OLT mengisi perintah rekomendasi secara otomatis
+      document.getElementById('olt-model').addEventListener('change', () => {
+        updateOltPresetUI({ regenerate: true });
+      });
+      ['olt-frame', 'olt-slot', 'olt-pon-port'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', () => updateOltPresetUI({ regenerate: true }));
+      });
+      document.getElementById('btn-olt-use-reco').addEventListener('click', () => {
+        updateOltPresetUI({ regenerate: true });
+        showToast('Perintah rekomendasi dipakai', 'info');
+      });
 
       // Initial renders
       updateKPIs();

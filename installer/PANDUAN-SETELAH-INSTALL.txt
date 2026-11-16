@@ -10,8 +10,9 @@ OptiPulse NOC sudah terpasang.
 2. Mengatur koneksi OLT (tanpa edit file):
    - Di aplikasi, buka tab "Dashboard & Monitoring".
    - Klik tombol "Pengaturan OLT" di kanan atas.
-   - Isi Host/IP OLT, Port (23 Telnet / 22 SSH), Username, Password,
-     dan tipe perangkat (mis. zte_zxros).
+   - Isi Host/IP OLT, Port (23 Telnet / 22 SSH), Username, dan Password.
+   - Pilih "Merek / model OLT" (ZTE, Huawei, atau Lainnya), lalu isi
+     Frame / Slot / Port PON. Perintah baca redaman terisi otomatis.
    - Klik "Tes Koneksi", lalu "Simpan".
 
    Pengaturan disimpan di PC server dan dipakai semua perangkat yang

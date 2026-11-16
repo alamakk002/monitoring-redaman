@@ -1,9 +1,9 @@
-; Inno Setup script untuk OptiPulse NOC
+﻿; Inno Setup script untuk OptiPulse NOC
 ; Build: "C:\Users\Lenovo\AppData\Local\Programs\Inno Setup 6\ISCC.exe" installer.iss
 ; Hasil: dist\OptiPulse-NOC-Setup.exe
 
 #define MyAppName "OptiPulse NOC"
-#define MyAppVersion "1.5.0"
+#define MyAppVersion "1.5.1"
 #define MyAppPublisher "OptiPulse"
 #define MyAppExeName "OptiPulse-NOC.exe"
 
